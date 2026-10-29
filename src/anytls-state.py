@@ -655,9 +655,11 @@ def list_groups_ui(state):
          'WARP · TCP' if g.get('egress') == 'warp' else '直连')
         for g in state['groups']]
     widths = [max(width(row[i]) for row in rows) for i in (0, 1, 2)]
-    for row in rows:
+    for index, row in enumerate(rows):
         fields = [row[i] + ' ' * (widths[i] - width(row[i])) for i in (0, 1, 2)]
         print('  ' + '  '.join(fields + [row[3]]))
+        if index == 0:
+            print('  ' + '  '.join('-' * widths[i] for i in (0, 1, 2)) + '  --------')
 
 
 def automatic_group_name(state):

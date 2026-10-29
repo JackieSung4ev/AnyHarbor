@@ -16,18 +16,41 @@ WORK=''
 readonly MANAGER_VERSION=1.7.1
 say() { printf '%s\n' "$*"; }
 die() { printf '错误：%s\n' "$*" >&2; exit 1; }
+ui_color() {
+    [[ -t 1 && ${TERM:-dumb} != dumb && -z ${NO_COLOR+x} ]]
+}
 ui_heading() {
-    if [[ -t 1 && ${TERM:-dumb} != dumb && -z ${NO_COLOR+x} ]]; then
-        printf '\n\033[1;36m%s\033[0m\n' "$1"
-    else printf '\n%s\n' "$1"; fi
+    # "page" redraws this menu; omit it mid-flow so previous steps remain visible.
+    if [[ ${2:-} == page && -t 1 && ${TERM:-dumb} != dumb ]]; then
+        printf '\033[H\033[2J'
+    fi
+    if ui_color; then
+        printf '\n\033[1;37;44m  %s  \033[0m\n\n' "$1"
+    else
+        printf '\n== %s ==\n\n' "$1"
+    fi
 }
 ui_section() {
-    if [[ -t 1 && ${TERM:-dumb} != dumb && -z ${NO_COLOR+x} ]]; then
-        printf '\n\033[1m--- %s ---\033[0m\n' "$1"
-    else printf '\n--- %s ---\n' "$1"; fi
+    if ui_color; then
+        printf '\n\033[1;33m  %s\033[0m\n' "$1"
+    else
+        printf '\n  %s\n' "$1"
+    fi
 }
-ui_item() { printf '  %2s) %s\n' "$1" "$2"; }
-ui_note() { printf '  %s\n' "$1"; }
+ui_item() {
+    if ui_color; then
+        printf '  \033[1;32m%2s)\033[0m  %s\n' "$1" "$2"
+    else
+        printf '  %2s)  %s\n' "$1" "$2"
+    fi
+}
+ui_note() {
+    if ui_color; then
+        printf '  \033[36m· %s\033[0m\n' "$1"
+    else
+        printf '  · %s\n' "$1"
+    fi
+}
 cleanup() {
     if [[ -n "$WORK" && "$WORK" == "$BASE/releases/"* && -d "$WORK" && ! -L "$WORK" ]]; then
         rm -f -- "$WORK/archive.tar.gz" "$WORK/release.json" "$WORK/tls-check.txt"
@@ -277,7 +300,7 @@ install_server() {
     (($# <= 2)) || die '用法：install 打开向导；install 地址 [端口] 使用兼容自签模式。'
     check_unit_overrides
     if [[ -L "$BASE/current" ]]; then die '已经安装。请使用菜单中的改端口、换密码或更新功能。'; fi
-    ui_heading "$APP_NAME $MANAGER_VERSION · 首次安装"
+    ui_heading "$APP_NAME $MANAGER_VERSION · 首次安装" page
     ui_section '[1/4] 检查安装参数'
     if (($# == 0)); then
         ui_note '填写当前服务器的域名及证书路径；全部检查通过后才创建账号和安装服务。'
@@ -371,36 +394,54 @@ install_server() {
     show_summary
 }
 ui_status_summary() {
-    local d status
+    local d status color
     if [[ -L "$BASE/current" ]]; then
         d=$(current)
-        if systemctl is-active --quiet "$SERVICE"; then status=运行中; else status=未运行; fi
-        ui_note "服务：$status | 管理工具：$MANAGER_VERSION"
-        ui_note "地址：$(py get "$d/state.json" server):$(py get "$d/state.json" port)"
-        ui_note "节点前缀：$(py get "$d/state.json" node_prefix) | 分组：$(py get "$d/state.json" active_group_count)/$(py get "$d/state.json" group_count) 个启用"
+        if systemctl is-active --quiet "$SERVICE"; then
+            status=运行中
+            color='1;32'
+        else
+            status=未运行
+            color='1;31'
+        fi
+        if ui_color; then
+            printf '  \033[36m服务\033[0m    \033[%sm%s\033[0m\n' "$color" "$status"
+            printf '  \033[36m地址\033[0m    %s:%s\n' "$(py get "$d/state.json" server)" "$(py get "$d/state.json" port)"
+            printf '  \033[36m前缀\033[0m    %s\n' "$(py get "$d/state.json" node_prefix)"
+            printf '  \033[36m分组\033[0m    %s/%s 启用\n' "$(py get "$d/state.json" active_group_count)" "$(py get "$d/state.json" group_count)"
+            printf '  \033[36m版本\033[0m    %s\n' "$MANAGER_VERSION"
+        else
+            printf '  服务    %s\n' "$status"
+            printf '  地址    %s:%s\n' "$(py get "$d/state.json" server)" "$(py get "$d/state.json" port)"
+            printf '  前缀    %s\n' "$(py get "$d/state.json" node_prefix)"
+            printf '  分组    %s/%s 启用\n' "$(py get "$d/state.json" active_group_count)" "$(py get "$d/state.json" group_count)"
+            printf '  版本    %s\n' "$MANAGER_VERSION"
+        fi
     elif [[ -e "$BASE" || -L "$BASE" ]]; then
         ui_note '状态：安装尚未完成；保留已有文件，修正报错后可重新运行 install。'
-    else ui_note '状态：尚未安装；选择 1 打开安装向导。'; fi
+    else
+        ui_note '状态：尚未安装；选择 9 打开安装向导。'
+    fi
 }
 show_summary() {
     local d; d=$(current)
     ui_section '分组（不显示密码）'
     py list-ui "$d/state.json"
     ui_section '导入客户端'
-    say "各组完整配置：$BASE/current/profiles/<组ID>.yaml"
-    say "v2rayN 分享链接：$BASE/current/v2rayn/<组ID>.txt"
+    ui_note "各组完整配置：$BASE/current/profiles/<组ID>.yaml"
+    ui_note "v2rayN 分享链接：$BASE/current/v2rayn/<组ID>.txt"
     if [[ $(py get "$d/state.json" tls_verify) == pki ]]; then
-        if [[ -d "$d/shadowrocket" ]]; then say "Shadowrocket 分享链接：$BASE/current/shadowrocket/<组ID>.txt"
-        else say '当前配置尚未生成 Shadowrocket 格式；请先运行 any upgrade-manager。'; fi
+        if [[ -d "$d/shadowrocket" ]]; then ui_note "Shadowrocket 分享链接：$BASE/current/shadowrocket/<组ID>.txt"
+        else ui_note '当前配置尚未生成 Shadowrocket 格式；请先运行 any upgrade-manager。'; fi
     else
-        say '当前使用固定证书指纹；Shadowrocket 格式仅在导入受信任 CA 证书后提供，不会跳过证书验证。'
+        ui_note '当前使用固定证书指纹；Shadowrocket 格式仅在导入受信任 CA 证书后提供，不会跳过证书验证。'
     fi
-    say '运行 any export <组ID> 查看该组所有支持的格式；运行 any groups 打开分组管理。'
-    say '需要单独保存文件时，使用 export <组ID> clash、v2rayn 或 shadowrocket。'
+    ui_note '运行 any export <组ID> 查看该组所有支持的格式；运行 any groups 打开分组管理。'
+    ui_note '需要单独保存文件时，使用 export <组ID> clash、v2rayn 或 shadowrocket。'
     if [[ $(py get "$d/state.json" subscription_enabled) == 1 ]]; then
-        say '在线订阅已配置。运行 any sub <组ID> 查看该组所有格式的订阅链接。'
+        ui_note '在线订阅已配置。运行 any sub <组ID> 查看该组所有格式的订阅链接。'
     else
-        say '尚未开启在线订阅；本地配置文件可直接导入。'
+        ui_note '尚未开启在线订阅；本地配置文件可直接导入。'
     fi
 }
 show_export() {
@@ -486,7 +527,7 @@ group_command() {
 }
 group_menu() {
     local choice identifier egress
-    ui_heading '分组管理'
+    ui_heading '分组管理' page
     ui_status_summary
     ui_section '当前分组'
     py list-ui "$(current)/state.json"
@@ -499,7 +540,7 @@ group_menu() {
     ui_item 6 '删除分组'
     ui_item 7 '选择分组出口：直连 / WARP'
     ui_item 0 '返回主菜单'
-    IFS= read -r -p '请输入选项编号：' choice || return 0
+    IFS= read -r -p $'\n请输入选项编号：' choice || return 0
     case "$choice" in
         1) group_command add;;
         2) menu_select_group identifier no all; group_command rename "$identifier";;
@@ -656,7 +697,7 @@ menu_select_group() {
     ui_section '选择分组'
     py group-options "$d/state.json" "$scope"
     if [[ "$allow_all" == yes ]]; then ui_item 0 '全部启用分组'; fi
-    if ! IFS= read -r -p '请输入分组前面的数字：' choice; then
+    if ! IFS= read -r -p $'\n请输入分组前面的数字：' choice; then
         die '已取消：输入结束，未输出配置或链接。'
     fi
     if [[ "$allow_all" == yes && "$choice" == 0 ]]; then selected=''
@@ -673,7 +714,7 @@ menu_ssh_source() {
     ui_section '绑定私有仓库更新'
     ui_note '每台服务器使用独立的只读 deploy key；这里只填写私钥文件路径，不粘贴内容。'
     ui_note '先将对应公钥添加到 GitHub 仓库 Deploy keys，不勾选 Allow write access。'
-    IFS= read -r -p 'GitHub 仓库 [JackieSung4ev/AnyHarbor]：' repository || die '已取消：输入结束。'
+    IFS= read -r -p $'\nGitHub 仓库 [JackieSung4ev/AnyHarbor]：' repository || die '已取消：输入结束。'
     IFS= read -r -p '本机私钥绝对路径 [/root/.ssh/gz-anytls_deploy]：' key_file || die '已取消：输入结束。'
     IFS= read -r -p '更新分支 [main]：' branch || die '已取消：输入结束。'
     main update-source-ssh "${repository:-JackieSung4ev/AnyHarbor}" "${key_file:-/root/.ssh/gz-anytls_deploy}" "${branch:-main}"
@@ -682,20 +723,21 @@ menu_git_source() {
     local repository branch
     ui_section '绑定公开仓库分支更新'
     ui_note '通过 HTTPS 匿名读取可信仓库；无需 Deploy Key 或 Release。'
-    IFS= read -r -p 'GitHub 仓库 [JackieSung4ev/AnyHarbor]：' repository || die '已取消：输入结束。'
+    IFS= read -r -p $'\nGitHub 仓库 [JackieSung4ev/AnyHarbor]：' repository || die '已取消：输入结束。'
     IFS= read -r -p '更新分支 [main]：' branch || die '已取消：输入结束。'
     main update-source-git "${repository:-JackieSung4ev/AnyHarbor}" "${branch:-main}"
 }
 menu_settings() {
     local choice prefix
-    ui_heading '连接与显示设置'
+    ui_heading '连接与显示设置' page
+    ui_section '操作'
     ui_item 1 '修改 AnyTLS 端口'
     ui_item 2 '修改客户端连接地址'
     ui_item 3 '导入 / 更新可信 SSL 证书'
     ui_item 4 '生成新自签证书（客户端需更新）'
     ui_item 5 '修改节点名称前缀'
     ui_item 0 '返回主菜单'
-    IFS= read -r -p '请输入选项编号：' choice || return 0
+    IFS= read -r -p $'\n请输入选项编号：' choice || return 0
     case "$choice" in
         1) main port;; 2) main server;; 3) main import-cert;; 4) main certificate;;
         5) IFS= read -r -p '新的节点名称前缀（例如 GZ-SV02）：' prefix || return 0
@@ -705,7 +747,8 @@ menu_settings() {
 }
 menu_updates() {
     local choice repository
-    ui_heading '更新与回退'
+    ui_heading '更新与回退' page
+    ui_section '管理工具与核心'
     ui_item 1 '检查管理工具更新'
     ui_item 2 '更新管理工具'
     ui_item 3 '更新 sing-box 核心'
@@ -716,7 +759,7 @@ menu_updates() {
     ui_item 7 '绑定公开 Release（会切换更新通道）'
     ui_item 8 '绑定公开仓库分支（HTTPS，无需密钥）'
     ui_item 0 '返回主菜单'
-    IFS= read -r -p '请输入选项编号：' choice || return 0
+    IFS= read -r -p $'\n请输入选项编号：' choice || return 0
     case "$choice" in
         1) main check-update;; 2) main self-update;; 3) main update;;
         4) main manager-rollback;; 5) main rollback;; 6) menu_ssh_source;;
@@ -739,17 +782,21 @@ menu_run() {
     if ((result != 0)); then
         ui_note "操作未完成（退出码 $result），请查看上方具体原因。"
     fi
-    IFS= read -r -p '按回车返回主菜单：' _reply || return 0
+    IFS= read -r -p $'\n按回车返回主菜单：' _reply || return 0
     if [[ "$runner" == "$MANAGER" && -f "$MANAGER" && -L "$MANAGER_CURRENT" &&
           $(readlink -f -- "$MANAGER_CURRENT") != "$(dirname -- "$SELF")" ]]; then
         exec bash "$MANAGER"
     fi
 }
 menu() {
-    local choice
+    local choice error=''
     while :; do
-        ui_heading "$APP_NAME $MANAGER_VERSION · 主菜单"
+        ui_heading "$APP_NAME $MANAGER_VERSION · 主菜单" page
         ui_status_summary
+        if [[ -n "$error" ]]; then
+            ui_note "$error"
+            error=''
+        fi
         ui_section '常用操作'
         ui_item 1 '服务状态与连接检查'
         ui_item 2 '导出节点（选组后显示全部格式）'
@@ -763,8 +810,9 @@ menu() {
         ui_section '安装与卸载'
         ui_item 9 '首次安装向导'
         ui_item 10 '卸载服务（保留配置备份）'
+        ui_section '退出'
         ui_item 0 '退出'
-        IFS= read -r -p '请输入选项编号：' choice || return 0
+        IFS= read -r -p $'\n请输入选项编号：' choice || return 0
         case "$choice" in
             1) menu_run diagnose;; 2) menu_run __menu-export;;
             3) menu_run subscription;; 4) menu_run groups;;
@@ -772,7 +820,7 @@ menu() {
             7) menu_run logs;; 8) menu_run restart;; 9) menu_run install;;
             11) menu_run warp;;
             10) menu_run uninstall; [[ -f "$MANAGER" ]] || return 0;; 0) return;;
-            *) ui_note '无效编号，请重新选择。';;
+            *) error='无效编号，请重新选择。';;
         esac
     done
 }

@@ -68,7 +68,7 @@ root_and_tools() { :; }
 root_readonly() { [[ -f "$1" && ! -L "$1" ]] || die 'Fixture launcher is not a regular file.'; }
 owned_base() { :; }
 lock_base() { exec 9>"$TEST_DIRECTORY/lock"; flock -n 9 || die 'Fixture lock inherited or not released.'; }
-ui_heading() { printf 'HEADING:%s\n' "$*"; }
+ui_heading() { printf 'HEADING:%s\n' "$1"; }
 ui_status_summary() { :; }
 ui_section() { printf 'SECTION:%s\n' "$*"; }
 ui_item() { printf '%s) %s\n' "$1" "$2"; }

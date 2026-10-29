@@ -91,9 +91,10 @@ WORK=''
 record() { printf '%s\n' "$*" >> "$TEST_EVENTS"; }
 say() { printf '%s\n' "$*"; }
 die() { printf '%s\n' "$*" >&2; exit 70; }
-ui_heading() { say "$*"; }
+ui_heading() { say "$1"; }
 ui_section() { say "$*"; }
 ui_item() { say "$*"; }
+ui_note() { say "$*"; }
 root_readonly() { [[ -f "$1" && ! -L "$1" ]] || die 'Unsafe fixture file.'; }
 free_port() { record "free-port:$*"; [[ ${BUSY_PORT:-0} == 0 ]] || die 'Occupied fixture port.'; }
 current() { printf '%s\n' "$TEST_DIRECTORY/current"; }

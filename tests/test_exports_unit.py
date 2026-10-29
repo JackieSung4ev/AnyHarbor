@@ -201,7 +201,7 @@ subscription_current_config() { printf '%s/nginx\n' "$TEST_DIRECTORY"; }
 show_summary() { printf '%s\n' 'Choose a group.' >&2; }
 ui_section() { printf '%s\n' "$*"; }
 ui_item() { printf '%s) %s\n' "$1" "$2"; }
-ui_heading() { printf '%s\n' "$*"; }
+ui_heading() { printf '%s\n' "$1"; }
 ui_note() { printf '%s\n' "$*"; }
 systemctl() { return 0; }
 '''

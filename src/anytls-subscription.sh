@@ -595,18 +595,18 @@ subscription_command() {
     shift || true
     if [[ "$action" == menu ]]; then
         menu_generation=$(current)
-        ui_heading '在线订阅'
-        ui_note '模式：HTTPS / 每个分组独立链接'
+        ui_heading '在线订阅' page
+        ui_note '模式    HTTPS，每个分组独立链接'
         if [[ $(py get "$menu_generation/state.json" subscription_enabled) == 1 ]]; then
             if systemctl is-active --quiet "$SUB_SERVICE"; then
-                ui_note '状态：已开启，订阅服务运行中'
+                ui_note '状态    已开启，订阅服务运行中'
             else
-                ui_note '状态：已配置，订阅服务未运行'
+                ui_note '状态    已配置，订阅服务未运行'
             fi
-            ui_note "域名：$(py get "$menu_generation/state.json" subscription_domain)"
-            ui_note "TCP 端口：$(py get "$menu_generation/state.json" subscription_port)"
+            ui_note "域名    $(py get "$menu_generation/state.json" subscription_domain)"
+            ui_note "端口    $(py get "$menu_generation/state.json" subscription_port)"
         else
-            ui_note '状态：未开启，本地配置仍可导入'
+            ui_note '状态    未开启，本地配置仍可导入'
             ui_note '启用需要域名及受信任的 HTTPS 证书'
         fi
         ui_section '订阅配置'
@@ -623,7 +623,7 @@ subscription_command() {
         ui_section '停用与返回'
         ui_item 4 '关闭在线订阅（代理账号仍有效）'
         ui_item 0 '返回主菜单'
-        read -r -p '输入选项编号：' choice
+        read -r -p $'\n请输入选项编号：' choice
         case "$choice" in
             1) action=enable;; 2) action=status;;
             3) menu_select_group identifier yes; action=links; set -- all "$identifier";;
