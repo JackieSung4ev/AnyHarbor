@@ -1,4 +1,4 @@
-AnyHarbor 1.7.0 — 使用与维护
+AnyHarbor 1.7.1 — 使用与维护
 
 项目：https://github.com/JackieSung4ev/AnyHarbor
 详细说明：https://github.com/JackieSung4ev/AnyHarbor/blob/main/docs/operations.md

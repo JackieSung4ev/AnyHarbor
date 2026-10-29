@@ -6,7 +6,7 @@
 
 使用官方 sing-box 核心，每个分组拥有独立密码和订阅链接，支持 Clash / Mihomo、v2rayN 和 Shadowrocket。AnyHarbor 是独立维护工具，并非 sing-box 官方安装器。
 
-**版本：1.7.0** · Debian + systemd · amd64 / arm64 · root 权限
+**版本：1.7.1** · Debian + systemd · amd64 / arm64 · root 权限
 
 ## 安装
 

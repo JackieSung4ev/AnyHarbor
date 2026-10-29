@@ -58,11 +58,11 @@ warp_require_ready() {
 }
 warp_set_proxy() {
     # Check every command: this function may run inside a conditional context.
-    # Configure local proxy BEFORE registration/connect, never full-host mode.
+    # These local settings work before registration. Protocol selection needs
+    # a registration and is deliberately performed later, before connect.
     warp_cli disconnect || return 1
     warp_cli mode proxy || return 1
     warp_cli proxy port 40000 || return 1
-    warp_cli tunnel protocol set MASQUE || return 1
 }
 warp_connect() {
     warp_owned || die '已有 WARP 不由本工具管理；仅可运行 any warp check，不自动接管其网络设置。'
@@ -70,6 +70,7 @@ warp_connect() {
     warp_cli registration show >/dev/null || die '未确认有效 WARP 注册，请先运行 any warp setup。'
     say '正在重连本工具的 WARP 本机代理；已有 WARP 分组会短暂断开。'
     if ! warp_set_proxy; then die '本机代理模式设置失败，未执行 connect。'; fi
+    warp_cli tunnel protocol set MASQUE || die 'MASQUE 协议设置失败，未执行 connect。'
     warp_cli connect || die 'WARP connect 失败；分组不会回落直连。'
     warp_wait_ready
 }
@@ -201,13 +202,16 @@ warp_setup() {
     elif ! warp_cli registration show >/dev/null; then
         die '上次注册未确认完成；未重复注册。检查 any warp logs，按官方说明完成注册后重新运行 setup。'
     fi
-    if ! warp_set_proxy; then die '本机代理模式设置失败，未注册或连接。'; fi
+    if ! warp_set_proxy; then die '本机代理模式设置失败，未执行 connect。'; fi
     if ((fresh)); then
         printf 'anyharbor-warp-v1:registering\n' >"$BASE/.warp-owner"
+        say '正在注册 WARP 设备……'
         warp_cli registration new || die 'WARP 注册失败；未连接或切换分组，请查看官方客户端错误。'
         # Do not assume a new registration preserves local preferences.
         if ! warp_set_proxy; then die '注册后无法确认本机代理设置，未执行 connect。'; fi
     fi
+    say '正在设置 WARP 协议 MASQUE……'
+    warp_cli tunnel protocol set MASQUE || die 'WARP 已注册，但 MASQUE 协议设置失败；未执行 connect。'
     printf 'anyharbor-warp-v1:registered\n' >"$BASE/.warp-owner"
     warp_cli connect || die 'WARP connect 失败；未切换分组。'
     warp_wait_ready

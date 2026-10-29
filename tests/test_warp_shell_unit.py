@@ -50,6 +50,7 @@ class WarpShellTests(unittest.TestCase):
         helper.write_json(self.state_path, state)
         self.events = self.directory / 'events'
         self.events.touch()
+        self.registration = self.directory / 'registration-present'
         self.cli = self.directory / 'warp-cli'
         self.template = self.directory / 'cli-template'
         self.template.write_text('''#!/usr/bin/env bash
@@ -59,6 +60,16 @@ shift 3
 printf 'cli:%s\\n' "$*" >> "$TEST_EVENTS"
 [[ "$*" != "${FAIL_CLI:-__none__}" ]] || exit 71
 if [[ "$*" == "${FAIL_AFTER_REGISTER:-__none__}" ]] && grep -Fqx 'cli:registration new' "$TEST_EVENTS"; then exit 71; fi
+case "$*" in
+    'registration new')
+        [[ ! -e "$TEST_DIRECTORY/registration-present" ]] || { printf 'Duplicate fixture registration.\\n' >&2; exit 92; }
+        printf 'registered\\n' > "$TEST_DIRECTORY/registration-present";;
+    'registration show'|'tunnel protocol set MASQUE'|'connect')
+        [[ -f "$TEST_DIRECTORY/registration-present" ]] || {
+            printf 'Error: Missing registration. Try running: "warp-cli registration new"\\n' >&2
+            exit 74
+        };;
+esac
 exit 0
 ''')
         self.template.chmod(0o755)
@@ -144,6 +155,8 @@ esac
         self.cli.chmod(0o755)
         if managed is not None:
             (self.base / '.warp-owner').write_text('anyharbor-warp-v1:' + managed + '\n')
+        if managed == 'registered':
+            self.registration.write_text('registered\n')
 
     def set_group_egress(self, egress, enabled=True):
         state = helper.load(self.state_path)
@@ -245,7 +258,7 @@ esac
         result = self.invoke('setup', answers='WARP\n')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.cli_actions(), ['disconnect', 'mode proxy', 'proxy port 40000',
-                                             'tunnel protocol set MASQUE', 'registration new',
+                                             'registration new',
                                              'disconnect', 'mode proxy', 'proxy port 40000',
                                              'tunnel protocol set MASQUE', 'connect'])
         self.assertEqual(self.actions().count('install-package'), 1)
@@ -254,7 +267,7 @@ esac
         self.assertNotIn('activate', self.actions())
 
     def test_each_proxy_setting_failure_stops_before_registration_even_inside_if(self):
-        steps = ['disconnect', 'mode proxy', 'proxy port 40000', 'tunnel protocol set MASQUE']
+        steps = ['disconnect', 'mode proxy', 'proxy port 40000']
         self.install_fixture_cli('installed')
         for index, step in enumerate(steps):
             with self.subTest(step=step):
@@ -277,6 +290,7 @@ esac
             with self.subTest(step=step):
                 self.events.write_text('')
                 (self.base / '.warp-owner').write_text('anyharbor-warp-v1:installed\n')
+                self.registration.unlink(missing_ok=True)
                 result = self.invoke('setup-if', FAIL_AFTER_REGISTER=step)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn('registration new', self.cli_actions())
@@ -284,6 +298,50 @@ esac
                 self.assertNotIn('connect', self.cli_actions())
                 self.assertNotIn('curl', self.actions())
                 self.assertEqual((self.base / '.warp-owner').read_text(), 'anyharbor-warp-v1:registering\n')
+
+    def test_170_installed_stage_resumes_without_reinstall_or_group_changes(self):
+        # 1.7.0 stopped after the three local proxy settings but before creating
+        # any registration. This is the exact state reported by the user.
+        self.install_fixture_cli('installed')
+        before = self.state_path.read_bytes()
+        result = self.invoke('setup-if')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        actions = self.cli_actions()
+        self.assertEqual(actions.count('registration new'), 1)
+        self.assertLess(actions.index('registration new'), actions.index('tunnel protocol set MASQUE'))
+        self.assertLess(actions.index('tunnel protocol set MASQUE'), actions.index('connect'))
+        self.assertNotIn('install-package', self.actions())
+        self.assert_no_group_change(before)
+        self.assertEqual((self.base / '.warp-owner').read_text(), 'anyharbor-warp-v1:registered\n')
+
+    def test_protocol_failure_after_registration_retries_without_new_registration(self):
+        self.install_fixture_cli('installed')
+        before = self.state_path.read_bytes()
+        result = self.invoke('setup-if', FAIL_CLI='tunnel protocol set MASQUE')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(self.registration.exists())
+        self.assertEqual(self.cli_actions().count('registration new'), 1)
+        self.assertEqual(self.cli_actions()[-1], 'tunnel protocol set MASQUE')
+        self.assertNotIn('connect', self.cli_actions())
+        self.assertNotIn('curl', self.actions())
+        self.assert_no_group_change(before)
+        self.events.write_text('')
+        result = self.invoke('setup-if')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.cli_actions(), ['registration show', 'disconnect', 'mode proxy',
+                                             'proxy port 40000', 'tunnel protocol set MASQUE', 'connect'])
+        self.assertNotIn('install-package', self.actions())
+        self.assert_no_group_change(before)
+
+    def test_registered_reconnect_protocol_failure_never_connects(self):
+        self.install_fixture_cli('registered')
+        before = self.state_path.read_bytes()
+        result = self.invoke('connect-if', FAIL_CLI='tunnel protocol set MASQUE')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.cli_actions(), ['registration show', 'disconnect', 'mode proxy',
+                                             'proxy port 40000', 'tunnel protocol set MASQUE'])
+        self.assertNotIn('curl', self.actions())
+        self.assert_no_group_change(before)
 
     def test_service_enable_failure_stops_even_inside_if(self):
         self.install_fixture_cli('installed')
