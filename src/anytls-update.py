@@ -259,6 +259,10 @@ def source_candidate(directory, blobs, current):
     require(version(wanted) >= version(current), 'Source downgrade refused; use manager-rollback.')
     # Build locally with the installed protocol, never execute a downloaded
     # build script (including tools/build_release.py) to prepare an update.
+    # Protocol 1 keeps state_schema=2 as its bootstrap compatibility contract:
+    # the candidate can migrate an existing schema-2 installation. Runtime
+    # state versions (including the WARP schema-3 barrier) are checked by the
+    # state helper and protect(), not this legacy package transport constant.
     manifest = {'product': 'gz-anytls-manager', 'version': wanted, 'update_protocol': 1,
                 'state_schema': 2, 'min_manager_version': '1.2.0',
                 'files': {name: hashlib.sha256(blobs[name]).hexdigest() for name in FILES}}
@@ -499,20 +503,26 @@ def protect(old, new, allow_prefix=False):
     old, new = Path(old), Path(new)
     states = [json.loads((p / 'state.json').read_text(encoding='utf-8')) for p in (old, new)]
     before, after = states
-    require(after.get('schema') == 2 and before.get('schema') in (1, 2), 'Unsupported upgrade state schema.')
+    require(after.get('schema') in (2, 3) and before.get('schema') in (1, 2, 3),
+            'Unsupported upgrade state schema.')
+    require(not (before['schema'] == 3 and after['schema'] != 3),
+            'Upgrade would remove the WARP state compatibility barrier.')
+    require(after['schema'] == 3 or not any(g.get('egress') == 'warp' for g in after['groups']),
+            'WARP groups require the state compatibility barrier.')
     keys = ('server', 'port', 'sni', 'tls_mode', 'version', 'sha256')
     require(all(before.get(k) == after.get(k) for k in keys), 'Upgrade changed endpoint/TLS/core metadata.')
     require(before.get('tls_verify', 'pin') == after.get('tls_verify'), 'Upgrade changed TLS verification mode.')
     require(before.get('subscription') == after.get('subscription'), 'Upgrade changed subscription settings.')
     require(allow_prefix or before.get('node_prefix', 'GZ') == after.get('node_prefix', 'GZ'),
             'Upgrade changed the server node prefix.')
-    identity = lambda g: (g['id'], g['password'], g['token'], g['enabled'])
-    if before['schema'] == 2:
+    identity = lambda g: (g['id'], g['password'], g['token'], g['enabled'], g.get('egress', 'direct'))
+    if before['schema'] in (2, 3):
         require(sorted(map(identity, before['groups'])) == sorted(map(identity, after['groups'])),
-                'Upgrade changed group IDs, passwords, tokens or enabled flags.')
+                'Upgrade changed group IDs, passwords, tokens, enabled flags or egress.')
     else:
         require(len(after['groups']) == 1 and after['groups'][0]['id'] == 'legacy'
-                and after['groups'][0]['password'] == before['password'] and after['groups'][0]['enabled'] is True,
+                and after['groups'][0]['password'] == before['password'] and after['groups'][0]['enabled'] is True
+                and after['groups'][0].get('egress', 'direct') == 'direct',
                 'Legacy migration changed the existing account.')
     for name in ('sing-box', 'server.crt', 'server.key'):
         require(hashlib.sha256((old / name).read_bytes()).digest() == hashlib.sha256((new / name).read_bytes()).digest(),

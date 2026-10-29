@@ -60,3 +60,35 @@ jobs:
         env:
           GZ_ANYTLS_DISPOSABLE_TEST: '1'
         run: python3 -B tests/test_subscription_routes_integration.py
+  warp-routing:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:13-slim@sha256:89c1ea91e897f0fe0a3731595330bc45b8bdef4047464a07116f891a94054b31
+    steps:
+      - name: Prepare disposable AnyTLS routing test container
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3 ca-certificates curl openssl
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Fetch and verify pinned official sing-box test binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -q -fsSL --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 90 --retry 2 https://api.github.com/repos/SagerNet/sing-box/releases/tags/v1.14.4 -o /tmp/sing-box-release.json
+          metadata=$(python3 -B src/anytls-state.py release /tmp/sing-box-release.json 1.14.4 amd64)
+          url=$(sed -n '2p' <<<"$metadata")
+          digest=$(sed -n '3p' <<<"$metadata")
+          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
+          curl -q -fsSL --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 300 --retry 2 "$url" -o /tmp/sing-box.tar.gz
+          printf '%s  /tmp/sing-box.tar.gz\n' "$digest" | sha256sum -c -
+          python3 -B src/anytls-state.py extract /tmp/sing-box.tar.gz /tmp/sing-box 1.14.4 amd64
+          chmod 0755 /tmp/sing-box
+      - name: Verify per-group routing and no direct fallback
+        env:
+          GZ_ANYTLS_DISPOSABLE_TEST: '1'
+          ANYHARBOR_TEST_SING_BOX: /tmp/sing-box
+        run: python3 -B tests/test_warp_routing_integration.py

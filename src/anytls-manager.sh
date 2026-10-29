@@ -13,7 +13,7 @@ readonly SHORT_MANAGER=/usr/local/sbin/any
 readonly OWNER_MARK=jackie-anytls-manager-v1 DEFAULT_VERSION=1.14.4
 SELF=$(readlink -f -- "${BASH_SOURCE[0]}")
 WORK=''
-readonly MANAGER_VERSION=1.6.0
+readonly MANAGER_VERSION=1.7.0
 say() { printf '%s\n' "$*"; }
 die() { printf '错误：%s\n' "$*" >&2; exit 1; }
 ui_heading() {
@@ -34,7 +34,7 @@ cleanup() {
     fi
 }
 trap cleanup EXIT
-trap 'printf "操作停止（第 %s 行）。请保留上方错误；脚本不会修改 APT 源或关闭防火墙。\n" "$LINENO" >&2' ERR
+trap 'printf "操作停止（第 %s 行）。请保留上方错误；脚本不会关闭防火墙。\n" "$LINENO" >&2' ERR
 
 # Helpers are installed together; never download or execute a remote script.
 HELPER_DIR=$(dirname -- "$SELF")
@@ -433,7 +433,7 @@ show_shadowrocket_export() {
     show_export "${1:-}" shadowrocket
 }
 group_command() {
-    local action=${1:-list} id=${2:-} label=${3:-} d automatic=0
+    local action=${1:-list} id=${2:-} label=${3:-} d automatic=0 egress=direct
     d=$(current)
     if [[ "$action" == list ]]; then py list "$d/state.json"; return; fi
     case "$action" in
@@ -441,24 +441,41 @@ group_command() {
             if (($# == 1)); then automatic=1
             elif (($# != 3)) || [[ -z "$id" || -z "$label" ]]; then
                 die '用法：any add，或 any group add [组ID 显示名称]'
-            fi;;
+            fi
+            if [[ -t 0 ]]; then warp_select_egress egress; fi;;
+        egress)
+            if (($# != 3)) || [[ -z "$id" || ( "$label" != direct && "$label" != warp ) ]]; then
+                die '用法：any group egress 组ID direct|warp'
+            fi
+            if [[ $(py group-egress "$d/state.json" "$id") == "$label" ]]; then
+                say '该分组出口没有改变。'; return
+            fi
+            egress=$label;;
         rename)
             [[ -n "$id" ]] || read -r -p '组ID（小写字母/数字/连字符，例如 athena）：' id
             [[ -n "$label" ]] || read -r -p '组显示名称：' label;;
         rotate|disable|enable|remove)
             [[ -n "$id" ]] || read -r -p '组ID：' id;;
-        *) die '分组命令：list/add/rename/rotate/disable/enable/remove';;
+        *) die '分组命令：list/add/rename/rotate/disable/enable/remove/egress';;
     esac
+    if [[ "$egress" == warp ]] ||
+       { [[ "$action" == enable ]] && [[ $(py group-egress "$d/state.json" "$id") == warp ]]; }; then
+        warp_require_ready
+    fi
     clone_current
     if [[ "$action" == add ]]; then
         if ((automatic)); then id=$(py group "$WORK/state.json" add)
         else id=$(py group "$WORK/state.json" add "$id" "$label"); fi
-    elif [[ "$action" == rename ]]; then py group "$WORK/state.json" "$action" "$id" "$label"
+        if [[ "$egress" == warp ]]; then py group "$WORK/state.json" egress "$id" warp; fi
+    elif [[ "$action" == rename || "$action" == egress ]]; then py group "$WORK/state.json" "$action" "$id" "$label"
     else py group "$WORK/state.json" "$action" "$id"; fi
     finalize_generation; activate "$WORK"
     say '分组变更已生效。应用配置会短暂重启整个 AnyTLS 服务。'
     if [[ "$action" == rotate || "$action" == disable || "$action" == enable ]]; then
         say '该组旧代理密码和旧订阅令牌已作废；其余组凭据保持不变。'
+    fi
+    if [[ "$action" == egress ]]; then
+        say "该组出口已设为 $egress；密码、订阅链接和入站端口不变。请刷新订阅以更新 UDP 提示。"
     fi
     show_summary
     if [[ "$action" == add ]]; then
@@ -468,7 +485,7 @@ group_command() {
     fi
 }
 group_menu() {
-    local choice identifier
+    local choice identifier egress
     ui_heading '分组管理'
     ui_status_summary
     ui_section '当前分组'
@@ -480,6 +497,7 @@ group_menu() {
     ui_item 4 '停用分组'
     ui_item 5 '重新启用分组'
     ui_item 6 '删除分组'
+    ui_item 7 '选择分组出口：直连 / WARP'
     ui_item 0 '返回主菜单'
     IFS= read -r -p '请输入选项编号：' choice || return 0
     case "$choice" in
@@ -489,6 +507,7 @@ group_menu() {
         4) menu_select_group identifier; group_command disable "$identifier";;
         5) menu_select_group identifier no disabled; group_command enable "$identifier";;
         6) menu_select_group identifier no all; group_command remove "$identifier";;
+        7) menu_select_group identifier no all; warp_select_egress egress; group_command egress "$identifier" "$egress";;
         0) return;; *) die '无效选择。';;
     esac
 }
@@ -586,7 +605,7 @@ uninstall_server() {
 }
 help_text() {
 cat <<'HELP'
-AnyHarbor 管理工具 1.6.0（独立 sing-box 服务）
+AnyHarbor 管理工具 1.7.0（独立 sing-box 服务）
 用法：any [命令]；直接输入 any 打开数字菜单
   install                            安装向导：域名与已有可信证书，或IPv4自签测试
   install 公网IPv4或域名 [端口8443]  兼容非交互安装，使用自签证书
@@ -599,6 +618,9 @@ AnyHarbor 管理工具 1.6.0（独立 sing-box 服务）
   add                                自动随机分配希腊名字及组ID，创建一组
   group add [组ID 显示名称]           不填参数自动分配；也可手动指定
   group list|add|rename|rotate|disable|enable|remove [组ID] [名称]
+  group egress 组ID direct|warp      切换整组出口，保留凭据；WARP仅支持TCP
+  warp                              WARP安装、连接检查及分组出口菜单
+  warp setup|check|connect|logs      官方本机代理；不启用整机WARP隧道
   prefix [新前缀]                    查看或设置本机节点名称前缀，默认GZ
   upgrade-manager                    升级管理工具及显示名称，保留现有账号
   update-source [owner/repo或GitHubURL] 查看来源；提供仓库时切换为公开Release下载
@@ -737,6 +759,7 @@ menu() {
         ui_item 6 '更新与回退'
         ui_item 7 '查看服务日志'
         ui_item 8 '重启代理服务'
+        ui_item 11 'Cloudflare WARP 出口'
         ui_section '安装与卸载'
         ui_item 9 '首次安装向导'
         ui_item 10 '卸载服务（保留配置备份）'
@@ -747,6 +770,7 @@ menu() {
             3) menu_run subscription;; 4) menu_run groups;;
             5) menu_run __menu-settings;; 6) menu_run __menu-updates;;
             7) menu_run logs;; 8) menu_run restart;; 9) menu_run install;;
+            11) menu_run warp;;
             10) menu_run uninstall; [[ -f "$MANAGER" ]] || return 0;; 0) return;;
             *) ui_note '无效编号，请重新选择。';;
         esac
@@ -769,6 +793,7 @@ main() {
         export-clash) show_clash_export "$@";;
         export-shadowrocket) show_shadowrocket_export "$@";;
         groups) group_menu;; group) group_command "$@";;
+        warp) warp_command "$@";;
         add) (($# == 0)) || die '用法：any add；手动命名请用 any group add 组ID 显示名称。'; group_command add;;
         prefix) prefix_command "$@";;
         subscription) subscription_command "$@";;

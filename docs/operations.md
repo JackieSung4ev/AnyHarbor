@@ -41,6 +41,7 @@ any export athena shadowrocket > /root/athena-shadowrocket.txt
 | 停用 | `any group disable athena` | 停用并作废原凭据 |
 | 启用 | `any group enable athena` | 生成新凭据，原凭据不恢复 |
 | 删除 | `any group remove athena` | 删除分组，原凭据失效 |
+| 选择出口 | `any group egress athena direct` / `any group egress athena warp` | 整组切换出口，保留密码和订阅 URL |
 
 默认创建 10 组，最多 100 组，包含停用组。自动命名会避开已有名称，基础名字用完后添加数字后缀。最后一个启用组不能停用或删除。
 
@@ -53,6 +54,37 @@ any prefix US-01
 ```
 
 节点显示为 `US-01 AnyTLS · Athena` 等。改前缀不换密码或订阅 URL；客户端刷新订阅即可看到新名称。前缀仅影响显示，域名、证书和端口仍须对应实际服务器。
+
+## Cloudflare WARP 出口
+
+WARP 位于 **AnyTLS 服务端之后**：客户端 → AnyTLS → 服务器直连，或本机 Cloudflare SOCKS → WARP。客户端仍使用原来的 AnyTLS 节点，无需安装 WARP。路由按认证分组选择，同组所有成员共用一种出口；复制两个相同账号的客户端节点不能获得两个独立出口。
+
+输入 `any` → **11 → 1**，在服务器终端阅读并确认 [Cloudflare 条款](https://www.cloudflare.com/application/terms/)及[隐私政策](https://www.cloudflare.com/application/privacypolicy/)。工具只从[官方 APT 仓库](https://pkg.cloudflareclient.com/)获取 WARP 软件包、验证签名和校验值，系统源负责依赖包；不使用第三方安装脚本。自动安装限 Debian 12/13、amd64/arm64，需要网络可访问官方仓库与 WARP 服务。
+
+设置使用官方 `warp-cli` 的 `proxy` 模式、MASQUE 协议和固定回环地址 `127.0.0.1:40000`，不启用整机 WARP 隧道。不需要对公网开放 40000，也不要修改它的监听地址。官方包会启动 `warp-svc`；工具要求首次安装前不存在 WARP 程序或数据，避免启动原有整机配置。若发现已有 WARP，只检查出口，不重新注册或接管；已有 MDM 策略由其管理员维护。
+
+若 APT 因其他源、签名或依赖错误而失败，先按错误修复对应源，再重试；工具不会关闭签名验证或替你删除其他源。安装中断后若已有 WARP 程序但归属阶段未确认，会停止自动接管，应先人工核对。注册失败后不会反复创建注册；按官方客户端报错处理，确认注册存在后再运行 `any warp setup`。
+
+检查通过后，运行 **4 → 7** 或 **11 → 3** 选组、选择出口。终端中 `any add` 会询问出口，默认直连；非交互新增仍默认直连。命令形式：
+
+```bash
+any warp setup                  # 首次设置；需在本机确认 Cloudflare 条款
+any warp check                  # 检查监听进程、回环地址及经 SOCKS 的 HTTPS 出口
+any group egress athena warp     # 整组改为 WARP；先检查出口，失败不保存
+any group egress athena direct   # 整组恢复直连；无需 WARP 在线
+```
+
+修改分组会短暂重启 AnyTLS 服务。密码、订阅令牌、节点名称、域名、证书和入站端口不变；订阅自动更新产物，客户端刷新原订阅即可。Clash 的 WARP 节点会标记 `udp: false`；其他客户端即使允许 UDP，服务端仍拒绝该组 UDP。
+
+**本功能只支持 TCP**。域名目标原样交给 SOCKS，不在该路由中提前解析；客户端自行发送的 DNS 不因此自动进入 WARP，不能据此宣称所有 DNS 都受到保护。依赖 UDP 的 QUIC、游戏、语音和 UDP DNS 不适合此出口；客户端应使用 TCP 或经代理的 DoH 等适配方式，或选直连组。
+
+WARP 失联时，该组连接失败，不回落服务器直连；直连组不依赖 WARP。运行 `any warp check` 和 `any warp logs` 排查，确认后 `any warp connect` 重连本工具管理的本机代理；已有 WARP 连接会短暂中断。WARP 恢复后新连接可恢复，无需为此重建分组。该工具不监控或阻止 root/其他管理工具事后更改 WARP 配置。
+
+`warp=on/plus` 只证明本次官方 HTTPS 检查经过 WARP，不证明 Grok 或其他网站接受该出口。WARP 不承诺住宅 IP。Cloudflare One 的本机代理文档还标注请求时限；是否影响消费版客户端的长连接需实际测试，首次只对一个分组试用并测试登录、聊天及长响应。
+
+首次选择 WARP 后，运行数据升级为 schema 3，并保留此兼容屏障。回退到不认识 WARP 的旧管理器会被拒绝，避免误变为直连；即使随后全部改回直连，也不会自动降级数据。核心回滚保留当前分组出口。常规 `any self-update` 仍可用，既有直连安装的更新流程不变。
+
+卸载 AnyHarbor 不删除 Cloudflare 客户端、注册和官方 APT 源；这些由系统独立管理。确认没有其他使用者后再按官方方式卸载。测试覆盖真实 sing-box 分流与故障处理，未替用户在生产服务器接受条款、注册设备或验证 Grok，见[测试范围](../src/TEST-RESULTS.txt)。
 
 ## 在线订阅
 

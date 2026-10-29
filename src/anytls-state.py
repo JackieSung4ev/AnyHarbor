@@ -206,7 +206,7 @@ def normalized(raw):
         state['schema'] = 2
         state['tls_verify'] = 'pin'
         state['subscription'] = None
-    require(state.get('schema') == 2, 'Unsupported managed state schema.')
+    require(state.get('schema') in (2, 3), 'Unsupported managed state schema.')
     state['node_prefix'] = node_prefix(state.get('node_prefix', 'GZ'))
     state['server'] = host(state['server'])
     state['sni'] = host(state['sni'])
@@ -231,11 +231,18 @@ def normalized(raw):
         require(isinstance(token, str) and TOKEN_RE.fullmatch(token) is not None,
                 'Invalid subscription token.')
         require(type(group.get('enabled')) is bool, 'Group enabled must be boolean.')
+        require(group.get('egress', 'direct') in ('direct', 'warp'),
+                'Group egress must be direct or warp.')
         require(identifier not in identifiers and password not in passwords and token not in tokens,
                 'Duplicate group ID or credential.')
         identifiers.add(identifier)
         passwords.add(password)
         tokens.add(token)
+    # Older managers ignore unknown group fields. Schema 3 makes them refuse
+    # to render WARP identities instead of silently converting them to direct.
+    # Keep this barrier even after the last WARP group is disabled or removed.
+    if any(g.get('egress') == 'warp' for g in groups):
+        state['schema'] = 3
     require(any(g['enabled'] for g in groups), 'At least one group must remain enabled.')
     subscription = state.get('subscription')
     if subscription is not None:
@@ -410,7 +417,8 @@ def group_documents(state, group, fingerprint, certificate):
              '    server: ' + q(state['server']), '    port: ' + str(state['port']),
              '    password: ' + q(group['password']), '    client-fingerprint: chrome',
              '    sni: ' + q(state['sni']), '    alpn:', '      - h2',
-             '    udp: true', '    skip-cert-verify: false']
+             '    udp: ' + ('false' if group.get('egress') == 'warp' else 'true'),
+             '    skip-cert-verify: false']
     if state['tls_verify'] == 'pin':
         lines.append('    fingerprint: ' + q(fingerprint))
     node = '\n'.join(lines) + '\n'
@@ -438,6 +446,26 @@ def render(directory):
                 'certificate_path': str(directory / 'server.crt'),
                 'key_path': str(directory / 'server.key')}
     }], 'outbounds': [{'type': 'direct', 'tag': 'direct'}]}
+    if state['schema'] == 3:
+        warp_users = [g['id'] for g in groups if g.get('egress') == 'warp']
+        direct_users = [g['id'] for g in groups if g.get('egress', 'direct') == 'direct']
+        rules = []
+        if warp_users:
+            config['outbounds'].append({'type': 'socks', 'tag': 'warp',
+                                        'server': '127.0.0.1', 'server_port': 40000,
+                                        'version': '5', 'network': 'tcp'})
+            rules.extend([
+                {'inbound': ['anytls-in'], 'auth_user': warp_users,
+                 'network': 'udp', 'action': 'reject'},
+                {'inbound': ['anytls-in'], 'auth_user': warp_users,
+                 'network': 'tcp', 'action': 'route', 'outbound': 'warp'}])
+        if direct_users:
+            rules.append({'inbound': ['anytls-in'], 'auth_user': direct_users,
+                          'action': 'route', 'outbound': 'direct'})
+        # No resolver/sniff action: send domain destinations through SOCKS5.
+        # Unknown/missing authenticated users must not inherit direct egress.
+        rules.append({'action': 'reject'})
+        config['route'] = {'rules': rules}
     profiles = output_directory(directory, 'profiles')
     nodes = output_directory(directory, 'nodes')
     subscriptions = output_directory(directory, 'subscriptions')
@@ -610,24 +638,26 @@ def check_subscriptions(directory, identifier=None):
 
 
 def list_groups(state):
-    print('ID\t分组\t状态')
+    print('ID\t分组\t状态\t出口')
     for group in state['groups']:
-        print('{}\t{}\t{}'.format(group['id'], group['label'], 'enabled' if group['enabled'] else 'disabled'))
+        print('{}\t{}\t{}\t{}'.format(group['id'], group['label'],
+              'enabled' if group['enabled'] else 'disabled', group.get('egress', 'direct')))
 
 
 def list_groups_ui(state):
-    """Align the human menu without changing the machine-readable TSV command."""
+    """Align the human menu, including the selected group egress."""
     def width(text):
         return sum(0 if unicodedata.combining(char) else
                    2 if unicodedata.east_asian_width(char) in ('W', 'F') else 1
                    for char in text)
-    rows = [('ID', '分组', '状态')] + [
-        (g['id'], g['label'], '已启用' if g['enabled'] else '已停用')
+    rows = [('ID', '分组', '状态', '出口')] + [
+        (g['id'], g['label'], '已启用' if g['enabled'] else '已停用',
+         'WARP · TCP' if g.get('egress') == 'warp' else '直连')
         for g in state['groups']]
-    widths = [max(width(row[i]) for row in rows) for i in (0, 1)]
+    widths = [max(width(row[i]) for row in rows) for i in (0, 1, 2)]
     for row in rows:
-        fields = [row[i] + ' ' * (widths[i] - width(row[i])) for i in (0, 1)]
-        print('  ' + '  '.join(fields + [row[2]]))
+        fields = [row[i] + ' ' * (widths[i] - width(row[i])) for i in (0, 1, 2)]
+        print('  ' + '  '.join(fields + [row[3]]))
 
 
 def automatic_group_name(state):
@@ -654,11 +684,16 @@ def edit_group(state, action, values):
         group = new_group(identifier, title)
         state['groups'].append(group)
         return group
-    require(len(values) == (2 if action == 'rename' else 1), 'Wrong group command arguments.')
+    require(len(values) == (2 if action in ('rename', 'egress') else 1), 'Wrong group command arguments.')
     group = selected_group(state, values[0], must_enable=False)
     if action == 'rename':
         group['label'] = label(values[1])
         group.pop('node_name', None)
+    elif action == 'egress':
+        require(values[1] in ('direct', 'warp'), 'Group egress must be direct or warp.')
+        group['egress'] = values[1]
+        if values[1] == 'warp':
+            state['schema'] = 3
     elif action == 'rotate':
         rotate(group)
     elif action in ('disable', 'enable'):
@@ -711,6 +746,8 @@ def main(argv):
         state, key = load(args[0]), args[1]
         subscription = state['subscription'] or {}
         derived = {'group_count': len(state['groups']), 'active_group_count': len(active(state)),
+                   'warp_group_count': sum(g.get('egress') == 'warp' for g in state['groups']),
+                   'active_warp_group_count': sum(g.get('egress') == 'warp' for g in active(state)),
                    'node_name_override_count': sum('node_name' in g for g in state['groups']),
                    'subscription_domain': subscription.get('domain', ''),
                    'subscription_port': subscription.get('port', 0),
@@ -721,6 +758,9 @@ def main(argv):
             value = derived[key] if key in derived else state[key]
         require(isinstance(value, (str, int)) and not isinstance(value, bool), 'Requested value is not scalar.')
         print(value)
+    elif command == 'group-egress':
+        require(len(args) == 2, 'Usage: group-egress STATE GROUP')
+        print(selected_group(load(args[0]), args[1], must_enable=False).get('egress', 'direct'))
     elif command == 'edit':
         filename, action, *values = args
         state = load(filename)
@@ -845,6 +885,7 @@ def main(argv):
         candidate['groups'] = copy.deepcopy(current['groups'])
         candidate['subscription'] = copy.deepcopy(current['subscription'])
         candidate['node_prefix'] = current['node_prefix']
+        candidate['schema'] = max(current['schema'], candidate['schema'])
         write_json(args[1], normalized(candidate))
     elif command == 'release':
         filename, wanted, architecture = args

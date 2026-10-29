@@ -6,7 +6,7 @@
 
 使用官方 sing-box 核心，每个分组拥有独立密码和订阅链接，支持 Clash / Mihomo、v2rayN 和 Shadowrocket。AnyHarbor 是独立维护工具，并非 sing-box 官方安装器。
 
-**版本：1.6.0** · Debian + systemd · amd64 / arm64 · root 权限
+**版本：1.7.0** · Debian + systemd · amd64 / arm64 · root 权限
 
 ## 安装
 
@@ -43,6 +43,7 @@ any
 | 5 | 地址、端口、证书与节点前缀 |
 | 6 | 更新与回退 |
 | 7 / 8 | 查看日志 / 重启服务 |
+| 11 | Cloudflare WARP 安装、出口检查与分组选择 |
 
 按数字选组，不需要记住组 ID。快捷命令 `any add` 会自动选择未使用的希腊英文名，最多支持 100 个分组。
 
@@ -65,6 +66,18 @@ any subscription check athena     # 检查本机实际发布的订阅正文
 ```
 
 只复制对应格式的配置或完整 URL，不复制标题。订阅已经编码，不要再次 Base64 编码；Clash YAML 转成 Base64 也不会成为 Shadowrocket 订阅。多台服务器汇总见[操作说明](docs/operations.md#汇总多个服务器)。
+
+## 可选 WARP 出口
+
+默认分组使用服务器直连。需要通过 Cloudflare 出口访问网站时：
+
+1. 输入 `any`，选择 **11 → 1**。阅读并同意 Cloudflare 条款后，安装官方客户端并配置本机 SOCKS 代理。
+2. 检查通过后，选择 **4 → 7**，按数字选组，再选 **WARP**。终端中运行 `any add` 时也会询问出口。
+3. 客户端刷新原订阅，再实际测试目标网站。密码、订阅 URL 和 AnyTLS 端口保持不变。
+
+自动安装支持 Debian 12/13；普通安装和更新不会启用 WARP。已有独立 WARP 配置只做检查，不自动接管。WARP 分组仅支持 **TCP**，故障时阻断该组流量，直连分组继续按原设置工作。
+
+WARP 更换的是出口路径，**不保证 Grok 放行，也不提供住宅 IP 保证**。首次建议先用一个分组验证。[安装边界、DNS 与诊断](docs/operations.md#cloudflare-warp-出口)
 
 ## 更新
 

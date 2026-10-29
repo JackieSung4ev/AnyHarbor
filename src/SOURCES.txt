@@ -81,3 +81,26 @@ https://curl.se/docs/manpage.html
 AnyTLS 官方URI规范：auth/地址/端口/SNI/insecure/fragment百分号编码（2026-10-28核对）
 https://github.com/anytls/anytls-go/blob/main/docs/uri_scheme.md
 该规范没有标准pin/PEM/ALPN/ClientHello指纹字段；通用导出不通过关闭证书校验替代。
+
+Cloudflare WARP（2026-10-29核对；无第三方安装脚本）
+官方Linux安装、注册与MASQUE
+https://developers.cloudflare.com/warp-client/get-started/linux/
+消费版本机代理模式
+https://developers.cloudflare.com/warp-client/warp-modes/
+官方APT仓库、Debian12/13与签名密钥
+https://pkg.cloudflareclient.com/
+主密钥指纹：C068A2B5771775193CBE1F2F6E2DD2174FA1C3BA
+签名验证后的2026.8.2115.0官方包warp-cli --help：
+mode proxy / proxy port 40000 / tunnel protocol set MASQUE / registration new / connect
+Cloudflare One本机代理限制（不将其时限直接视为消费版实测结论）
+https://developers.cloudflare.com/cloudflare-one/team-and-resources/devices/cloudflare-one-client/configure/modes/
+Linux MDM路径/var/lib/cloudflare-warp/mdm.xml
+https://developers.cloudflare.com/cloudflare-one/team-and-resources/devices/cloudflare-one-client/deployment/mdm-deployment/
+条款与隐私
+https://www.cloudflare.com/application/terms/
+https://www.cloudflare.com/application/privacypolicy/
+sing-box认证用户路由、reject与SOCKS出站
+https://sing-box.sagernet.org/configuration/route/rule/
+https://sing-box.sagernet.org/configuration/route/rule_action/
+https://sing-box.sagernet.org/configuration/outbound/socks/
+https://github.com/SagerNet/sing-box/blob/v1.14.4/protocol/anytls/inbound.go

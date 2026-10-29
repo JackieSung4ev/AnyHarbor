@@ -1,4 +1,4 @@
-AnyHarbor 1.6.0 — 使用与维护
+AnyHarbor 1.7.0 — 使用与维护
 
 项目：https://github.com/JackieSung4ev/AnyHarbor
 详细说明：https://github.com/JackieSung4ev/AnyHarbor/blob/main/docs/operations.md
@@ -12,8 +12,9 @@ AnyHarbor 1.6.0 — 使用与维护
   1 状态与连接检查    2 导出全部节点格式    3 HTTPS 订阅
   4 分组管理          5 地址/端口/证书/前缀 6 更新与回退
   7 查看日志          8 重启服务           0 退出
+  11 Cloudflare WARP 出口（可选，不随普通安装或升级启用）
 
-any add 自动随机新增一个希腊英文名分组，生成独立密码和订阅令牌。
+any add 自动随机新增一个希腊英文名分组，生成独立密码和订阅令牌；终端中询问出口，默认直连。
 默认10组，最多100组，包含停用组。最后一个启用组不能停用或删除。
 
 二、节点和订阅
@@ -89,3 +90,22 @@ NO_COLOR=1 any可关闭菜单颜色。
 当前未隔离代理对服务器本机、私网和链路本地目的地址的访问，请按可信成员分发并加固网络边界。
 不提供按组限速、到期、设备数量限制或自动流量统计；容量取决于并发、带宽和流量额度。
 官方来源与实际测试范围分别见SOURCES.txt和TEST-RESULTS.txt。
+
+六、可选 Cloudflare WARP 出口
+
+运行 any → 11 → 1，阅读并确认 Cloudflare 条款后，安装官方软件包并设置本机代理。
+自动安装仅支持 Debian 12/13、amd64/arm64；已有 WARP/MDM 不会被自动接管。
+本机 SOCKS 固定127.0.0.1:40000，使用proxy/MASQUE，不启用整机隧道、不对公网开放此端口。
+设置成功后，在4 → 7或11 → 3按数字选组，切换直连/WARP；同组全部成员共用出口。
+  any warp check                     检查监听及经代理的HTTPS出口
+  any group egress athena warp        切换整组至WARP
+  any group egress athena direct      恢复该组直连
+  any warp connect                   重连本工具管理的WARP，已有WARP连接短暂中断
+  any warp logs                      查看官方客户端日志
+
+出口切换保留密码、订阅URL、入站端口和证书；客户端刷新原订阅即可。
+WARP分组仅TCP，UDP在服务端拒绝；WARP失效时阻断该组，不回落直连。
+域名目标交给SOCKS解析，但客户端自行使用的DNS不因此自动进入WARP。
+warp=on/plus检查不保证Grok放行，不保证住宅IP；长连接和目标网站应先单组实测。
+启用WARP后数据升级为schema3，回退不支持WARP的旧管理器会被拒绝，正常self-update仍可用。
+卸载AnyHarbor会保留Cloudflare客户端、注册和官方APT源，按官方流程另外维护。
