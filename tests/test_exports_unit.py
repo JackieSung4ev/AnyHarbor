@@ -203,6 +203,7 @@ ui_section() { printf '%s\n' "$*"; }
 ui_item() { printf '%s) %s\n' "$1" "$2"; }
 ui_heading() { printf '%s\n' "$1"; }
 ui_note() { printf '%s\n' "$*"; }
+ui_prompt() { IFS= read -r -p "$2" "$1"; }
 systemctl() { return 0; }
 '''
         # Use a script file so read consumes the supplied answers, not shell code.

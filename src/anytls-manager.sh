@@ -21,11 +21,15 @@ ui_color() {
 }
 ui_heading() {
     # "page" redraws this menu; omit it mid-flow so previous steps remain visible.
+    local width=72
     if [[ ${2:-} == page && -t 1 && ${TERM:-dumb} != dumb ]]; then
         printf '\033[H\033[2J'
     fi
     if ui_color; then
-        printf '\n\033[1;37;44m  %s  \033[0m\n\n' "$1"
+        [[ ${COLUMNS:-} =~ ^[0-9]+$ ]] && width=$COLUMNS
+        (( width < 40 )) && width=40
+        (( width > 72 )) && width=72
+        printf '\n\033[1;37;44m%-*s\033[0m\n\n' "$width" "  $1"
     else
         printf '\n== %s ==\n\n' "$1"
     fi
@@ -50,6 +54,23 @@ ui_note() {
     else
         printf '  · %s\n' "$1"
     fi
+}
+ui_warn() {
+    if ui_color; then
+        printf '  \033[1;31m· %s\033[0m\n' "$1"
+    else
+        printf '  · %s\n' "$1"
+    fi
+}
+ui_prompt() {
+    local target=$1 text=$2 answer
+    if [[ -t 2 && ${TERM:-dumb} != dumb && -z ${NO_COLOR+x} ]]; then
+        printf '\n\033[1;36m%s\033[0m ' "$text" >&2
+    else
+        printf '\n%s ' "$text" >&2
+    fi
+    IFS= read -r answer || return 1
+    printf -v "$target" '%s' "$answer"
 }
 cleanup() {
     if [[ -n "$WORK" && "$WORK" == "$BASE/releases/"* && -d "$WORK" && ! -L "$WORK" ]]; then
@@ -541,7 +562,7 @@ group_menu() {
     ui_item 6 '删除分组'
     ui_item 7 '选择分组出口：直连 / WARP'
     ui_item 0 '返回主菜单'
-    IFS= read -r -p $'\n请输入选项编号：' choice || return 0
+    ui_prompt choice '请输入选项编号：' || return 0
     case "$choice" in
         1) group_command add;;
         2) menu_select_group identifier no all; group_command rename "$identifier";;
@@ -698,7 +719,7 @@ menu_select_group() {
     ui_section '选择分组'
     py group-options "$d/state.json" "$scope"
     if [[ "$allow_all" == yes ]]; then ui_item 0 '全部启用分组'; fi
-    if ! IFS= read -r -p $'\n请输入分组前面的数字：' choice; then
+    if ! ui_prompt choice '请输入分组前面的数字：'; then
         die '已取消：输入结束，未输出配置或链接。'
     fi
     if [[ "$allow_all" == yes && "$choice" == 0 ]]; then selected=''
@@ -715,17 +736,17 @@ menu_ssh_source() {
     ui_section '绑定私有仓库更新'
     ui_note '每台服务器使用独立的只读 deploy key；这里只填写私钥文件路径，不粘贴内容。'
     ui_note '先将对应公钥添加到 GitHub 仓库 Deploy keys，不勾选 Allow write access。'
-    IFS= read -r -p $'\nGitHub 仓库 [JackieSung4ev/AnyHarbor]：' repository || die '已取消：输入结束。'
-    IFS= read -r -p '本机私钥绝对路径 [/root/.ssh/gz-anytls_deploy]：' key_file || die '已取消：输入结束。'
-    IFS= read -r -p '更新分支 [main]：' branch || die '已取消：输入结束。'
+    ui_prompt repository 'GitHub 仓库 [JackieSung4ev/AnyHarbor]：' || die '已取消：输入结束。'
+    ui_prompt key_file '本机私钥绝对路径 [/root/.ssh/gz-anytls_deploy]：' || die '已取消：输入结束。'
+    ui_prompt branch '更新分支 [main]：' || die '已取消：输入结束。'
     main update-source-ssh "${repository:-JackieSung4ev/AnyHarbor}" "${key_file:-/root/.ssh/gz-anytls_deploy}" "${branch:-main}"
 }
 menu_git_source() {
     local repository branch
     ui_section '绑定公开仓库分支更新'
     ui_note '通过 HTTPS 匿名读取可信仓库；无需 Deploy Key 或 Release。'
-    IFS= read -r -p $'\nGitHub 仓库 [JackieSung4ev/AnyHarbor]：' repository || die '已取消：输入结束。'
-    IFS= read -r -p '更新分支 [main]：' branch || die '已取消：输入结束。'
+    ui_prompt repository 'GitHub 仓库 [JackieSung4ev/AnyHarbor]：' || die '已取消：输入结束。'
+    ui_prompt branch '更新分支 [main]：' || die '已取消：输入结束。'
     main update-source-git "${repository:-JackieSung4ev/AnyHarbor}" "${branch:-main}"
 }
 menu_settings() {
@@ -738,10 +759,10 @@ menu_settings() {
     ui_item 4 '生成新自签证书（客户端需更新）'
     ui_item 5 '修改节点名称前缀'
     ui_item 0 '返回主菜单'
-    IFS= read -r -p $'\n请输入选项编号：' choice || return 0
+    ui_prompt choice '请输入选项编号：' || return 0
     case "$choice" in
         1) main port;; 2) main server;; 3) main import-cert;; 4) main certificate;;
-        5) IFS= read -r -p '新的节点名称前缀（例如 GZ-SV02）：' prefix || return 0
+        5) ui_prompt prefix '新的节点名称前缀（例如 GZ-SV02）：' || return 0
            [[ -n "$prefix" ]] || die '前缀不能为空。'; main prefix "$prefix";;
         0) return;; *) die '无效选择。';;
     esac
@@ -760,11 +781,11 @@ menu_updates() {
     ui_item 7 '绑定公开 Release（会切换更新通道）'
     ui_item 8 '绑定公开仓库分支（HTTPS，无需密钥）'
     ui_item 0 '返回主菜单'
-    IFS= read -r -p $'\n请输入选项编号：' choice || return 0
+    ui_prompt choice '请输入选项编号：' || return 0
     case "$choice" in
         1) main check-update;; 2) main self-update;; 3) main update;;
         4) main manager-rollback;; 5) main rollback;; 6) menu_ssh_source;;
-        7) IFS= read -r -p '可信 GitHub 仓库（owner/repo）：' repository || return 0
+        7) ui_prompt repository '可信 GitHub 仓库（owner/repo）：' || return 0
            [[ -n "$repository" ]] || die '仓库不能为空。'; main update-source "$repository";;
         8) menu_git_source;;
         0) return;; *) die '无效选择。';;
@@ -781,9 +802,9 @@ menu_run() {
     # Do not call a shell function in an `if`: it disables errexit inside it.
     bash "$runner" "$@" || result=$?
     if ((result != 0)); then
-        ui_note "操作未完成（退出码 $result），请查看上方具体原因。"
+        ui_warn "操作未完成（退出码 $result），请查看上方具体原因。"
     fi
-    IFS= read -r -p $'\n按回车返回主菜单：' _reply || return 0
+    ui_prompt _reply '按回车返回主菜单：' || return 0
     if [[ "$runner" == "$MANAGER" && -f "$MANAGER" && -L "$MANAGER_CURRENT" &&
           $(readlink -f -- "$MANAGER_CURRENT") != "$(dirname -- "$SELF")" ]]; then
         exec bash "$MANAGER"
@@ -795,7 +816,7 @@ menu() {
         ui_heading "$APP_NAME $MANAGER_VERSION · 主菜单" page
         ui_status_summary
         if [[ -n "$error" ]]; then
-            ui_note "$error"
+            ui_warn "$error"
             error=''
         fi
         ui_section '常用操作'
@@ -813,7 +834,7 @@ menu() {
         ui_item 10 '卸载服务（保留配置备份）'
         ui_section '退出'
         ui_item 0 '退出'
-        IFS= read -r -p $'\n请输入选项编号：' choice || return 0
+        ui_prompt choice '请输入选项编号：' || return 0
         case "$choice" in
             1) menu_run diagnose;; 2) menu_run __menu-export;;
             3) menu_run subscription;; 4) menu_run groups;;

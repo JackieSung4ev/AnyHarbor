@@ -117,6 +117,7 @@ subscription_initialize() { die 'Unexpected live mutation'; }
 ui_heading() { :; }
 ui_section() { :; }
 ui_note() { :; }
+ui_prompt() { IFS= read -r -p "$2" "$1"; }
 ui_item() { printf '%s %s\n' "$@"; }
 menu_select_group() { printf -v "$1" '%s' athena; }
 '''

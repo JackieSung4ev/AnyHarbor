@@ -73,6 +73,8 @@ ui_status_summary() { :; }
 ui_section() { printf 'SECTION:%s\n' "$*"; }
 ui_item() { printf '%s) %s\n' "$1" "$2"; }
 ui_note() { printf '%s\n' "$*"; }
+ui_warn() { printf '%s\n' "$*"; }
+ui_prompt() { IFS= read -r -p "$2" "$1"; }
 say() { printf '%s\n' "$*"; }
 systemctl() { return 0; }
 diagnose() {

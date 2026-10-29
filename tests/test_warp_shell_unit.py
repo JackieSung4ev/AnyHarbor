@@ -95,6 +95,8 @@ ui_heading() { say "$1"; }
 ui_section() { say "$*"; }
 ui_item() { say "$*"; }
 ui_note() { say "$*"; }
+ui_warn() { say "$*"; }
+ui_prompt() { IFS= read -r -p "$2" "$1"; }
 root_readonly() { [[ -f "$1" && ! -L "$1" ]] || die 'Unsafe fixture file.'; }
 free_port() { record "free-port:$*"; [[ ${BUSY_PORT:-0} == 0 ]] || die 'Occupied fixture port.'; }
 current() { printf '%s\n' "$TEST_DIRECTORY/current"; }

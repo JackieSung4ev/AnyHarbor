@@ -170,7 +170,9 @@ warp_setup() {
         say 'Cloudflare 会处理该出口流量；不保证目标网站可用。'
         say '条款：https://www.cloudflare.com/application/terms/'
         say '隐私：https://www.cloudflare.com/application/privacypolicy/'
-        IFS= read -r -p '阅读并同意上述条款及安装操作后输入 WARP；其他输入取消：' answer || return 0
+        ui_warn '要继续安装，下一行必须原样输入大写单词 WARP。'
+        ui_note '直接回车，或输入其他内容（包括小写 warp），都会取消，不会安装或注册。'
+        ui_prompt answer '请输入大写 WARP：' || return 0
         [[ "$answer" == WARP ]] || { say '已取消，未安装或注册。'; return; }
         if [[ -e "$BASE/.warp-owner" || -L "$BASE/.warp-owner" ]]; then die 'WARP 归属记录异常，未覆盖。'; fi
         printf 'anyharbor-warp-v1:prepared\n' >"$BASE/.warp-owner"
@@ -212,7 +214,7 @@ warp_select_egress() {
     ui_section '分组出口（同组所有成员共用）'
     ui_item 1 '直连：服务器公网出口（默认）'
     ui_item 2 'Cloudflare WARP：仅 TCP，断线阻断，不回落直连'
-    IFS= read -r -p $'\n请输入编号 [1]：' answer || die '已取消，未修改分组。'
+    ui_prompt answer '请输入编号 [1]：' || die '已取消，未修改分组。'
     case "${answer:-1}" in 1) selected=direct;; 2) selected=warp;; *) die '无效出口编号。';; esac
     printf -v "$target" '%s' "$selected"
 }
@@ -228,13 +230,13 @@ warp_command() {
             ui_heading 'Cloudflare WARP · 本机代理出口' page
             ui_note "启用的 WARP 分组：$(py get "$(current)/state.json" active_warp_group_count)"
             ui_section '操作'
-            ui_item 1 '安装并设置官方 WARP（首次需要同意 Cloudflare 条款）'
+            ui_item 1 '安装并设置官方 WARP（须输入大写 WARP 确认条款）'
             ui_item 2 '检查本机代理与实际 HTTPS 出口'
             ui_item 3 '选择分组出口：直连 / WARP'
             ui_item 4 '重连本工具管理的 WARP'
             ui_item 5 '查看 WARP 服务日志'
             ui_item 0 '返回主菜单'
-            IFS= read -r -p $'\n请输入选项编号：' choice || return 0
+            ui_prompt choice '请输入选项编号：' || return 0
             case "$choice" in
                 1) warp_setup;; 2) warp_check;;
                 3) menu_select_group identifier no all; warp_select_egress egress; group_command egress "$identifier" "$egress";;

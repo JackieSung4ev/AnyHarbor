@@ -623,7 +623,7 @@ subscription_command() {
         ui_section '停用与返回'
         ui_item 4 '关闭在线订阅（代理账号仍有效）'
         ui_item 0 '返回主菜单'
-        read -r -p $'\n请输入选项编号：' choice
+        ui_prompt choice '请输入选项编号：' || return 0
         case "$choice" in
             1) action=enable;; 2) action=status;;
             3) menu_select_group identifier yes; action=links; set -- all "$identifier";;

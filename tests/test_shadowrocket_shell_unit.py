@@ -81,6 +81,7 @@ systemctl() { :; }
 ui_heading() { :; }
 ui_section() { :; }
 ui_note() { printf '%s\n' "$*"; }
+ui_prompt() { IFS= read -r -p "$2" "$1"; }
 ui_item() { :; }
 menu_select_group() { printf -v "$1" '%s' athena; }
 py() {
