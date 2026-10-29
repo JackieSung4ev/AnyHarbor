@@ -1,8 +1,8 @@
-AnyHarbor 1.7.1 — 使用与维护
+AnyHarbor 1.7.2 — 使用与维护
 
 项目：https://github.com/JackieSung4ev/AnyHarbor
 详细说明：https://github.com/JackieSung4ev/AnyHarbor/blob/main/docs/operations.md
-支持 Debian + systemd、amd64/arm64、root 权限；使用官方 sing-box 核心。
+支持 Debian 12/13、Ubuntu 22.04/24.04/26.04 + systemd、amd64/arm64；管理命令需要 root，代理进程使用专用系统用户。使用官方 sing-box 核心。
 安装入口及前置条件见项目首页。需要域名、有效证书链及私钥文件路径，向导询问端口和节点前缀。
 源码更新只下载代码，不上传密码、证书私钥或订阅令牌。
 
@@ -39,7 +39,7 @@ Shadowrocket/标准URI只用于可信证书模式，自签/固定证书模式不
 
 三、HTTPS订阅
 
-需要可信域名证书、正确DNS和可用Nginx。已有宝塔/Nginx时复用；未安装时安装nginx-light。
+需要可信域名证书、正确DNS和可用Nginx。已有宝塔/Nginx时复用；未安装时 Debian 安装 nginx-light，Ubuntu 安装 nginx。
 运行any → 3 → 1，或any subscription enable。默认复用已导入域名和证书，只询问端口。
 默认订阅TCP端口9443，必须与代理端口不同，均在1024..65535范围内，并分别放行防火墙。
 使用其他域名或新证书时选择3 → 8；分发链接使用3 → 3，只向成员提供所属组链接。
@@ -94,7 +94,7 @@ NO_COLOR=1 any可关闭菜单颜色。
 六、可选 Cloudflare WARP 出口
 
 运行 any → 11 → 1，阅读并确认 Cloudflare 条款后，安装官方软件包并设置本机代理。
-自动安装仅支持 Debian 12/13、amd64/arm64；已有 WARP/MDM 不会被自动接管。
+自动安装仅支持 Debian 12/13、Ubuntu 22.04/24.04/26.04、amd64/arm64；已有 WARP/MDM 不会被自动接管。
 本机 SOCKS 固定127.0.0.1:40000，使用proxy/MASQUE，不启用整机隧道、不对公网开放此端口。
 设置成功后，在4 → 7或11 → 3按数字选组，切换直连/WARP；同组全部成员共用出口。
   any warp check                     检查监听及经代理的HTTPS出口

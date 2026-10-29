@@ -2,11 +2,11 @@
 
 [![检查状态](https://github.com/JackieSung4ev/AnyHarbor/actions/workflows/check.yml/badge.svg)](https://github.com/JackieSung4ev/AnyHarbor/actions/workflows/check.yml)
 
-在 Debian 上管理 AnyTLS。安装后输入 **`any`**，按数字完成分组、节点导出、订阅和日常维护。
+在 Debian 或 Ubuntu LTS 上管理 AnyTLS。安装后输入 **`any`**，按数字完成分组、节点导出、订阅和日常维护。
 
 使用官方 sing-box 核心，每个分组拥有独立密码和订阅链接，支持 Clash / Mihomo、v2rayN 和 Shadowrocket。AnyHarbor 是独立维护工具，并非 sing-box 官方安装器。
 
-**版本：1.7.1** · Debian + systemd · amd64 / arm64 · root 权限
+**版本：1.7.2** · Debian 12/13、Ubuntu 22.04/24.04/26.04 + systemd · amd64 / arm64 · 管理命令需要 root
 
 ## 安装
 
@@ -75,7 +75,7 @@ any subscription check athena     # 检查本机实际发布的订阅正文
 2. 检查通过后，选择 **4 → 7**，按数字选组，再选 **WARP**。终端中运行 `any add` 时也会询问出口。
 3. 客户端刷新原订阅，再实际测试目标网站。密码、订阅 URL 和 AnyTLS 端口保持不变。
 
-自动安装支持 Debian 12/13；普通安装和更新不会启用 WARP。已有独立 WARP 配置只做检查，不自动接管。WARP 分组仅支持 **TCP**，故障时阻断该组流量，直连分组继续按原设置工作。
+自动安装支持 Debian 12/13 与 Ubuntu 22.04/24.04/26.04；普通安装和更新不会启用 WARP。已有独立 WARP 配置只做检查，不自动接管。WARP 分组仅支持 **TCP**，故障时阻断该组流量，直连分组继续按原设置工作。
 
 WARP 更换的是出口路径，**不保证 Grok 放行，也不提供住宅 IP 保证**。首次建议先用一个分组验证。[安装边界、DNS 与诊断](docs/operations.md#cloudflare-warp-出口)
 

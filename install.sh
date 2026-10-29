@@ -4,11 +4,30 @@ set -Eeuo pipefail
 umask 077
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C
 die() { printf '错误：%s\n' "$*" >&2; exit 1; }
+require_supported_os() {
+    local id='' version='' key value
+    [[ $(uname -s) == Linux ]] || die '本入口仅支持 Linux。'
+    [[ -r /etc/os-release ]] || die '缺少可读的 /etc/os-release。'
+    while IFS= read -r line || [[ -n ${line:-} ]]; do
+        key=${line%%=*}
+        value=${line#*=}
+        value=${value#\"}; value=${value%\"}
+        value=${value#\'}; value=${value%\'}
+        case "$key" in
+            ID) id=$value ;;
+            VERSION_ID) version=$value ;;
+        esac
+    done < /etc/os-release
+    case "$id:$version" in
+        debian:12|debian:13|ubuntu:22.04|ubuntu:24.04|ubuntu:26.04) ;;
+        *) die "仅支持 Debian 12/13 与 Ubuntu 22.04/24.04/26.04（当前：${id:-unknown} ${version:-unknown}）。" ;;
+    esac
+}
 OPERATION=install
 for argument in "$@"; do
 case "$argument" in
     -h|--help)
-        printf '%s\n' 'AnyHarbor 安装入口（Debian + systemd，使用 root 运行）' \
+        printf '%s\n' 'AnyHarbor 安装入口（Debian 12/13 或 Ubuntu 22.04/24.04/26.04 + systemd，使用 root 运行）' \
             '首次安装：在源码目录运行 bash ./install.sh' \
             '更新已有安装：bash ./install.sh --upgrade。' \
             '自动检查依赖、构建并校验安装包；仅首次安装询问域名、证书、端口等。' \
@@ -21,10 +40,8 @@ case "$argument" in
     *) die '不支持该参数；使用 --help 查看用法。' ;;
 esac
 done
-[[ $EUID -eq 0 ]] || die '请在 Debian 服务器上使用 root 运行。'
-if [[ $(uname -s) != Linux ]] || ! grep -Eq '^ID="?debian"?$' /etc/os-release; then
-    die '本入口仅支持 Debian Linux。'
-fi
+[[ $EUID -eq 0 ]] || die '请使用 root 运行。'
+require_supported_os
 if [[ $OPERATION == install ]]; then
     [[ ! -e /opt/jackie-anytls && ! -L /opt/jackie-anytls ]] ||
         die '检测到已有安装；请使用 any self-update，或运行 bash ./install.sh --upgrade，不要重新安装或删除数据。'

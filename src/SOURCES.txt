@@ -87,7 +87,7 @@ Cloudflare WARP（2026-10-29核对；无第三方安装脚本）
 https://developers.cloudflare.com/warp-client/get-started/linux/
 消费版本机代理模式
 https://developers.cloudflare.com/warp-client/warp-modes/
-官方APT仓库、Debian12/13与签名密钥
+官方APT仓库、Debian 12/13、Ubuntu 22.04/24.04/26.04 与签名密钥
 https://pkg.cloudflareclient.com/
 主密钥指纹：C068A2B5771775193CBE1F2F6E2DD2174FA1C3BA
 签名验证后的2026.8.2115.0官方包warp-cli --help：

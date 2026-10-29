@@ -42,11 +42,37 @@ OLD_GROUP_LABELS = dict(zip((identifier for identifier, _ in DEFAULT_GROUPS),
 ID_RE = re.compile(r'[a-z][a-z0-9_-]{0,31}')
 TOKEN_RE = re.compile(r'[A-Za-z0-9_-]{43}')
 CA_BUNDLE = '/etc/ssl/certs/ca-certificates.crt'
+APT_OS_NOTICE = '仅支持 Debian 12/13 与 Ubuntu 22.04/24.04/26.04。'
+APT_OS_SUITES = {
+    ('debian', '12'): 'bookworm',
+    ('debian', '13'): 'trixie',
+    ('ubuntu', '22.04'): 'jammy',
+    ('ubuntu', '24.04'): 'noble',
+    ('ubuntu', '26.04'): 'resolute',
+}
 
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def parse_os_release(path):
+    """Read ID and VERSION_ID from os-release text; never execute the file."""
+    values = {}
+    with open(path, encoding='utf-8') as stream:
+        for line in stream:
+            key, sep, value = line.rstrip().partition('=')
+            if sep and key in ('ID', 'VERSION_ID'):
+                values[key] = ''.join(shlex.split(value)) if value else ''
+    return values
+
+
+def apt_os_suite(path='/etc/os-release'):
+    values = parse_os_release(path)
+    suite = APT_OS_SUITES.get((values.get('ID'), values.get('VERSION_ID')))
+    require(suite is not None, APT_OS_NOTICE)
+    return suite
 
 
 def nginx_lua_path(binary):
@@ -938,6 +964,9 @@ def main(argv):
             os.chmod(directory / 'server.crt', 0o600)
         finally:
             request.unlink(missing_ok=True)
+    elif command == 'apt-suite':
+        require(len(args) <= 1, 'Usage: apt-suite [OS_RELEASE]')
+        print(apt_os_suite(args[0] if args else '/etc/os-release'))
     elif command == 'nginx-lua-path':
         require(len(args) == 1, 'Usage: nginx-lua-path NGINX_BINARY')
         print(nginx_lua_path(args[0]))

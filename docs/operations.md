@@ -59,7 +59,7 @@ any prefix US-01
 
 WARP 位于 **AnyTLS 服务端之后**：客户端 → AnyTLS → 服务器直连，或本机 Cloudflare SOCKS → WARP。客户端仍使用原来的 AnyTLS 节点，无需安装 WARP。路由按认证分组选择，同组所有成员共用一种出口；复制两个相同账号的客户端节点不能获得两个独立出口。
 
-输入 `any` → **11 → 1**，在服务器终端阅读并确认 [Cloudflare 条款](https://www.cloudflare.com/application/terms/)及[隐私政策](https://www.cloudflare.com/application/privacypolicy/)。工具只从[官方 APT 仓库](https://pkg.cloudflareclient.com/)获取 WARP 软件包、验证签名和校验值，系统源负责依赖包；不使用第三方安装脚本。自动安装限 Debian 12/13、amd64/arm64，需要网络可访问官方仓库与 WARP 服务。
+输入 `any` → **11 → 1**，在服务器终端阅读并确认 [Cloudflare 条款](https://www.cloudflare.com/application/terms/)及[隐私政策](https://www.cloudflare.com/application/privacypolicy/)。工具只从[官方 APT 仓库](https://pkg.cloudflareclient.com/)获取 WARP 软件包、验证签名和校验值，系统源负责依赖包；不使用第三方安装脚本。自动安装限 Debian 12/13 与 Ubuntu 22.04/24.04/26.04、amd64/arm64，需要网络可访问官方仓库与 WARP 服务。
 
 设置使用官方 `warp-cli` 的 `proxy` 模式、MASQUE 协议和固定回环地址 `127.0.0.1:40000`，不启用整机 WARP 隧道。不需要对公网开放 40000，也不要修改它的监听地址。官方包会启动 `warp-svc`；工具要求首次安装前不存在 WARP 程序或数据，避免启动原有整机配置。若发现已有 WARP，只检查出口，不重新注册或接管；已有 MDM 策略由其管理员维护。
 
@@ -93,7 +93,10 @@ WARP 失联时，该组连接失败，不回落服务器直连；直连组不依
 订阅需要已解析到本机的域名、有效的完整证书链及私钥，以及可用的 Nginx。已有宝塔或其他 Nginx 时复用现有程序并确保 `nginx` 在 PATH 中；尚未安装时：
 
 ```bash
+# Debian
 apt-get update && apt-get install -y nginx-light
+# Ubuntu
+apt-get update && apt-get install -y nginx
 ```
 
 运行 `any` → **3 → 1**，或：

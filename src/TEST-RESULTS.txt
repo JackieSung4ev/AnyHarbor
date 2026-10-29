@@ -1,4 +1,4 @@
-AnyHarbor 1.7.1 — 验证范围
+AnyHarbor 1.7.2 — 验证范围
 日期：2026-10-29（Asia/Shanghai）
 
 自动检查
@@ -17,6 +17,8 @@ WARP分组出口
 - 27项Shell命令fixture测试：条款未同意不安装、已有安装/MDM/安装中断保护、
   mode/proxy端口/MASQUE顺序、失败不继续注册或连接、健康检查失败不修改分组、
   NO_PROXY不能绕过SOCKS检查、非回环或错误进程监听拒绝、真实PTY新增分组选择。
+- 1.7.2 安装入口与 WARP APT 套件允许 Debian 12/13、Ubuntu 22.04/24.04/26.04。
+  单元测试覆盖 os-release 解析；未在生产 Ubuntu 上完成安装或 WARP 注册。
 - 1.7.1修复首次注册顺序：1.7.0的fixture未模拟MASQUE需要已有注册，漏过此错误。
   已用实际1.7.0代码与有状态fixture复现Missing registration；新顺序先注册再设置
   MASQUE。验证installed阶段继续而不重装、注册后设置失败不连接、重试不重复注册，

@@ -4,10 +4,29 @@ set -Eeuo pipefail
 umask 077
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C
 die() { printf '错误：%s\n' "$*" >&2; exit 1; }
+require_supported_os() {
+    local id='' version='' key value
+    [[ $(uname -s) == Linux ]] || die '本入口仅支持 Linux。'
+    [[ -r /etc/os-release ]] || die '缺少可读的 /etc/os-release。'
+    while IFS= read -r line || [[ -n ${line:-} ]]; do
+        key=${line%%=*}
+        value=${line#*=}
+        value=${value#\"}; value=${value%\"}
+        value=${value#\'}; value=${value%\'}
+        case "$key" in
+            ID) id=$value ;;
+            VERSION_ID) version=$value ;;
+        esac
+    done < /etc/os-release
+    case "$id:$version" in
+        debian:12|debian:13|ubuntu:22.04|ubuntu:24.04|ubuntu:26.04) ;;
+        *) die "仅支持 Debian 12/13 与 Ubuntu 22.04/24.04/26.04（当前：${id:-unknown} ${version:-unknown}）。" ;;
+    esac
+}
 ARGS=()
 case "${1:-}" in
     -h|--help)
-        printf '%s\n' 'AnyHarbor 在线安装入口（Debian + systemd，root）' \
+        printf '%s\n' 'AnyHarbor 在线安装入口（Debian 12/13 或 Ubuntu 22.04/24.04/26.04 + systemd，root）' \
             '不带参数安装；--upgrade 更新已有安装。日常管理运行 any。'
         exit 0 ;;
     '') ;;
@@ -16,7 +35,7 @@ case "${1:-}" in
 esac
 [[ $# -le 1 ]] || die '仅接受 --upgrade 或 --help。'
 [[ $EUID -eq 0 ]] || die '请使用 root 运行。'
-[[ $(uname -s) == Linux ]] && grep -Eq '^ID="?debian"?$' /etc/os-release || die '仅支持 Debian Linux。'
+require_supported_os
 [[ -d /run/systemd/system ]] && command -v systemctl >/dev/null && \
     systemctl show --property=Version --value >/dev/null || die '需要运行中的 systemd。'
 for directory in / /opt; do

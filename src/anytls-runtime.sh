@@ -86,18 +86,8 @@ warp_install_package() {
     local codename source=/etc/apt/sources.list.d/anyharbor-cloudflare-warp.list
     local key=/usr/share/keyrings/anyharbor-cloudflare-warp.gpg staging architecture
     local -a official_apt packages
-    # os-release is data, never source an arbitrary shell file as root.
-    codename=$(python3 -c '
-import shlex
-values = {}
-with open("/etc/os-release") as stream:
-    for line in stream:
-        key, sep, value = line.rstrip().partition("=")
-        if sep and key in ("ID", "VERSION_ID"):
-            values[key] = "".join(shlex.split(value))
-if values.get("ID") != "debian" or values.get("VERSION_ID") not in ("12", "13"):
-    raise SystemExit("WARP 自动安装仅支持 Debian 12/13。")
-print({"12": "bookworm", "13": "trixie"}[values["VERSION_ID"]])') || return 1
+    # os-release is data, never sourced as shell. Suite names match Cloudflare's APT repo.
+    codename=$(py apt-suite) || return 1
     architecture=$(dpkg --print-architecture) || return 1
     case "$architecture" in amd64|arm64) :;; *) die 'WARP 自动安装仅支持 amd64/arm64。';; esac
     root_readonly /etc/apt/sources.list.d; root_readonly /usr/share/keyrings

@@ -80,7 +80,7 @@ chown() { printf '%s\0' "$@" >>"$TEST_ROOT/chown.args"; }
 systemctl() { :; }
 ui_heading() { :; }
 ui_section() { :; }
-ui_note() { :; }
+ui_note() { printf '%s\n' "$*"; }
 ui_item() { :; }
 menu_select_group() { printf -v "$1" '%s' athena; }
 py() {
@@ -278,7 +278,7 @@ py() {
         self.assertIn('不会跳过证书验证', result.stdout)
         result = self.run_shell('help_text')
         self.assert_success(result)
-        self.assertIn('1.7.1', result.stdout)
+        self.assertIn('1.7.2', result.stdout)
         self.assertIn('export-shadowrocket', result.stdout)
         self.assertIn('subscription check', result.stdout)
 

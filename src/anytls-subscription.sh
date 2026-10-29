@@ -396,7 +396,7 @@ subscription_enable() {
     port=$(sed -n '2p' <<<"$validated")
     [[ ! "$domain" =~ ^[0-9.]+$ ]] || die 'HTTPS 订阅请使用有受信任证书的域名。'
     [[ "$certificate" == /* && "$key" == /* && -f "$certificate" && -f "$key" ]] || die '证书/私钥必须是已存在文件的绝对路径。'
-    nginx=$(command -v nginx) || die '未安装 nginx。请先安装发行版 nginx（例如 apt-get install nginx-light），再执行此命令。本工具不会自动安装或修改系统 nginx。'
+    nginx=$(command -v nginx) || die '未安装 nginx。请先安装发行版 nginx（Debian：apt-get install nginx-light；Ubuntu：apt-get install nginx），再执行此命令。本工具不会自动安装或修改系统 nginx。'
     command -v runuser >/dev/null || die '缺少 runuser，请安装 util-linux。'
     nginx=$(readlink -f -- "$nginx")
     root_readonly "$nginx"

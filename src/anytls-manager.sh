@@ -13,7 +13,7 @@ readonly SHORT_MANAGER=/usr/local/sbin/any
 readonly OWNER_MARK=jackie-anytls-manager-v1 DEFAULT_VERSION=1.14.4
 SELF=$(readlink -f -- "${BASH_SOURCE[0]}")
 WORK=''
-readonly MANAGER_VERSION=1.7.1
+readonly MANAGER_VERSION=1.7.2
 say() { printf '%s\n' "$*"; }
 die() { printf '错误：%s\n' "$*" >&2; exit 1; }
 ui_color() {
@@ -298,6 +298,7 @@ install_read() {
 install_server() {
     local address=${1:-} p=${2:-8443} prefix=GZ mode=2 cert='' key='' cert_default key_default
     (($# <= 2)) || die '用法：install 打开向导；install 地址 [端口] 使用兼容自签模式。'
+    py apt-suite >/dev/null
     check_unit_overrides
     if [[ -L "$BASE/current" ]]; then die '已经安装。请使用菜单中的改端口、换密码或更新功能。'; fi
     ui_heading "$APP_NAME $MANAGER_VERSION · 首次安装" page
@@ -646,7 +647,7 @@ uninstall_server() {
 }
 help_text() {
 cat <<'HELP'
-AnyHarbor 管理工具 1.7.1（独立 sing-box 服务）
+AnyHarbor 管理工具 1.7.2（独立 sing-box 服务）
 用法：any [命令]；直接输入 any 打开数字菜单
   install                            安装向导：域名与已有可信证书，或IPv4自签测试
   install 公网IPv4或域名 [端口8443]  兼容非交互安装，使用自签证书
