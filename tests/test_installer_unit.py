@@ -477,22 +477,38 @@ class InstallerIsolatedTests(unittest.TestCase):
         blocks = re.findall(r'```bash\n(.*?)\n```', (ROOT / 'README.md').read_text(), re.DOTALL)
         commands = [block for block in blocks if 'curl ' in block and '/main/bootstrap.sh' in block]
         self.assertEqual(len(commands), 1, 'Expected one documented bootstrap command')
-        self.command('curl',
-                     'printf \'printf "downloaded script\\\\n" >>"$TEST_EVENTS"; '
-                     'read -r answer; printf "stdin %%s\\\\n" "$answer" >>"$TEST_EVENTS"\\n\'\n'
-                     'exit "${TEST_CURL_STATUS:-0}"')
-        for status in (22, 0):
-            with self.subTest(download_status=status):
-                self.events.write_text('')
-                result = subprocess.run(
-                    [BASH, '-c', commands[0]], input='after-download\n', capture_output=True,
-                    text=True, encoding='utf-8', timeout=10,
-                    env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root',
-                         'TEST_EVENTS': str(self.events), 'TEST_CURL_STATUS': str(status)},
-                )
-                self.assertEqual(result.returncode, status, result.stdout + result.stderr)
-                expected = [] if status else ['downloaded script', 'stdin after-download']
-                self.assertEqual(self.events.read_text().splitlines(), expected)
+        # Keep this network fixture separate from setUp's optional missing-tool
+        # fallback, without replacing a real curl or weakening command() guards.
+        download_tools = self.scratch / 'download-tools'
+        download_tools.mkdir()
+        download_curl = download_tools / 'curl'
+        download_curl.write_text(
+            '#!/bin/bash\n'
+            'printf \'printf "downloaded script\\\\n" >>"$TEST_EVENTS"; '
+            'read -r answer; printf "stdin %%s\\\\n" "$answer" >>"$TEST_EVENTS"\\n\'\n'
+            'exit "${TEST_CURL_STATUS:-0}"\n')
+        download_curl.chmod(0o700)
+        base_tools = self.scratch / 'base-tools'
+        base_tools.mkdir()
+        (base_tools / 'bash').symlink_to(BASH)
+        base_curl = base_tools / 'curl'
+        for available in (False, True):
+            if available:
+                base_curl.write_text('#!/bin/bash\nexit 98\n')
+                base_curl.chmod(0o700)
+            self.assertEqual(shutil.which('curl', path=str(base_tools)) is not None, available)
+            for status in (22, 0):
+                with self.subTest(base_curl_available=available, download_status=status):
+                    self.events.write_text('')
+                    result = subprocess.run(
+                        [BASH, '-c', commands[0]], input='after-download\n', capture_output=True,
+                        text=True, encoding='utf-8', timeout=10,
+                        env={'PATH': str(download_tools) + os.pathsep + str(base_tools), 'HOME': '/root',
+                             'TEST_EVENTS': str(self.events), 'TEST_CURL_STATUS': str(status)},
+                    )
+                    self.assertEqual(result.returncode, status, result.stdout + result.stderr)
+                    expected = [] if status else ['downloaded script', 'stdin after-download']
+                    self.assertEqual(self.events.read_text().splitlines(), expected)
 
 
 if __name__ == '__main__':
