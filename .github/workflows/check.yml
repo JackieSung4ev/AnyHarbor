@@ -1,0 +1,62 @@
+name: Check AnyHarbor
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check syntax, update guards, group allocation and package build
+        run: |
+          set -euo pipefail
+          for script in bootstrap.sh install.sh src/anytls-manager.sh src/anytls-runtime.sh src/anytls-subscription.sh; do
+            bash -n "$script"
+          done
+          python3 -m py_compile src/anytls-state.py src/anytls-update.py tools/build_release.py
+          python3 -m unittest discover -s tests -p 'test_*_unit.py'
+          python3 tools/build_release.py
+  installer:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:13-slim@sha256:89c1ea91e897f0fe0a3731595330bc45b8bdef4047464a07116f891a94054b31
+    steps:
+      - name: Prepare disposable Debian test container
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3 ca-certificates git
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Exercise first-install safety and interactive input
+        env:
+          GZ_INSTALLER_INTEGRATION: '1'
+        run: python3 -B -m unittest discover -s tests -p test_installer_unit.py -v
+  subscriptions:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:13-slim@sha256:89c1ea91e897f0fe0a3731595330bc45b8bdef4047464a07116f891a94054b31
+    steps:
+      - name: Prepare disposable HTTPS subscription test container
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3 ca-certificates nginx-light curl openssl util-linux passwd
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify subscription bodies with real Nginx and TLS
+        env:
+          GZ_ANYTLS_DISPOSABLE_TEST: '1'
+        run: python3 -B tests/test_subscription_routes_integration.py

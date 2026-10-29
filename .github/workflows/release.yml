@@ -1,0 +1,88 @@
+name: Build AnyHarbor release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gz-anytls-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the triggering commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate syntax and build the allow-listed archive
+        env:
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          for script in src/anytls-manager.sh src/anytls-runtime.sh src/anytls-subscription.sh; do
+            bash -n "$script"
+          done
+          python3 -m py_compile src/anytls-state.py src/anytls-update.py tools/build_release.py
+          python3 -m unittest discover -s tests -p 'test_*_unit.py'
+          args=()
+          if [[ -n "$RELEASE_TAG" ]]; then args+=(--tag "$RELEASE_TAG"); fi
+          python3 tools/build_release.py "${args[@]}"
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the same immutable commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Rebuild the verified release
+        id: build
+        env:
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [[ -n "$RELEASE_TAG" ]]; then args+=(--tag "$RELEASE_TAG"); fi
+          python3 tools/build_release.py "${args[@]}" --github-output "$GITHUB_OUTPUT"
+      - name: Create a draft release without replacing existing versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.build.outputs.tag }}
+          ARCHIVE: ${{ steps.build.outputs.archive }}
+        run: |
+          set -euo pipefail
+          commit=$(git rev-parse HEAD)
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            tagged_commit=$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")
+            if [[ "$tagged_commit" != "$commit" ]]; then
+              echo 'This version tag points at a different commit. Use a new version.' >&2
+              exit 1
+            fi
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'This release already exists. Do not overwrite a published version.' >&2
+            exit 1
+          fi
+          printf '%s\n' \
+            'Source-only AnyHarbor manager release.' \
+            "Built from commit $commit." \
+            'Review the attached archive and TEST-RESULTS.txt, then publish this draft as a stable latest release.' \
+            > release-notes.txt
+          gh release create "$RELEASE_TAG" "$ARCHIVE" "$ARCHIVE.sha256" \
+            --target "$commit" --draft --title "AnyHarbor $RELEASE_TAG" \
+            --notes-file release-notes.txt
+          printf '%s\n' 'Draft created. Publish it from the repository Releases page when ready.'

@@ -1,0 +1,83 @@
+官方资料（核对日期：2026-10-27，Asia/Shanghai）
+
+sing-box AnyTLS入站 / 多用户
+https://sing-box.sagernet.org/configuration/inbound/anytls/
+sing-box官方发布1.14.4
+https://github.com/SagerNet/sing-box/releases/tag/v1.14.4
+Mihomo AnyTLS
+https://wiki.metacubex.one/config/proxies/anytls/
+Mihomo TLS、指纹与正常证书验证
+https://wiki.metacubex.one/config/proxies/tls/
+Mihomo测试客户端启动顺序与post-up就绪钩子（v1.19.33）
+https://github.com/MetaCubeX/mihomo/blob/v1.19.33/main.go
+https://github.com/MetaCubeX/mihomo/blob/v1.19.33/hub/executor/executor.go
+Clash Verge订阅导入
+https://www.clashverge.dev/guide/profile.html
+Nginx location/alias/HTTP配置
+https://nginx.org/en/docs/http/ngx_http_core_module.html
+Nginx HTTPS
+https://nginx.org/en/docs/http/ngx_http_ssl_module.html
+Google BBR
+https://github.com/google/bbr/blob/master/Documentation/bbr-quick-start.md
+Linux拥塞控制默认值与监听继承
+https://kernel.org/doc/html/latest/networking/ip-sysctl.html
+
+AnyHarbor 为本次需求编写的维护封装，不是上述项目官方发布。
+发行包不包含密码、私钥、真实账号名单或远程管理凭据。
+
+YAML官方规范：普通字符串、单引号与类型解析
+https://yaml.org/spec/1.2.2/#73-flow-scalar-styles
+
+v2rayN官方：剪贴板导入（Ctrl+V）与订阅
+https://github.com/2dust/v2rayN/wiki/Description-of-some-ui
+https://github.com/2dust/v2rayN/wiki/Description-of-subscription
+v2rayN 7.22.6内部分享格式、配置字段与TLS证书映射
+https://github.com/2dust/v2rayN/blob/7.22.6/v2rayN/ServiceLib/Handler/Fmt/InnerFmt.cs
+https://github.com/2dust/v2rayN/blob/7.22.6/v2rayN/ServiceLib/Models/Entities/ProfileItem.cs
+https://github.com/2dust/v2rayN/blob/7.22.6/v2rayN/ServiceLib/Services/CoreConfig/Singbox/SingboxOutboundService.cs
+https://github.com/2dust/v2rayN/blob/7.22.6/v2rayN/ServiceLib/Enums/EConfigType.cs
+https://github.com/2dust/v2rayN/blob/7.22.6/v2rayN/ServiceLib/Enums/ECoreType.cs
+v2rayN 7.25.6同格式兼容核对
+https://github.com/2dust/v2rayN/blob/7.25.6/v2rayN/ServiceLib/Handler/Fmt/InnerFmt.cs
+https://github.com/2dust/v2rayN/blob/7.25.6/v2rayN/ServiceLib/Services/CoreConfig/Singbox/SingboxOutboundService.cs
+https://github.com/2dust/v2rayN/releases/tag/7.25.6
+
+GitHub稳定Release与附件SHA256元数据
+https://docs.github.com/en/rest/releases/releases
+https://docs.github.com/en/rest/releases/assets
+GitHub手动运行工作流与gh发布草稿
+https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow
+https://cli.github.com/manual/gh_release_create
+发布模板固定使用官方checkout提交
+https://github.com/actions/checkout/commit/3d3c42e5aac5ba805825da76410c181273ba90b1
+
+GitHub只读deploy key：私钥留在服务器，公钥绑定单个仓库
+https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys
+GitHub官方SSH主机指纹及公钥（固定Ed25519，严格校验）
+https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints
+Git官方：环境/配置隔离、fetch与读取已锁定提交的对象
+https://git-scm.com/docs/git
+https://git-scm.com/docs/git-fetch
+https://git-scm.com/docs/git-ls-tree
+https://git-scm.com/docs/git-cat-file
+匿名 Git HTTPS 更新：协议白名单、凭据助手、TLS 校验与禁止重定向（2026-10-29 核对）
+https://git-scm.com/docs/git-config
+
+Nginx 官方命令参数：-e stderr 自1.19.5支持；代码按实际帮助输出检测
+https://nginx.org/en/docs/switches.html
+OpenResty 官方：配套 Lua 库、版本兼容要求及 lua_package_path
+https://github.com/openresty/lua-resty-core#prerequisites
+https://github.com/openresty/lua-resty-core#installation
+https://github.com/openresty/lua-nginx-module#lua_package_path
+Lua 模块初始化源码：ngx_test_config 时跳过运行时初始化
+https://github.com/openresty/lua-nginx-module/blob/master/src/ngx_http_lua_module.c
+
+GitHub 仓库改名：旧 clone/fetch/push 地址重定向（2026-10-28 核对）
+https://docs.github.com/en/repositories/creating-and-managing-repositories/renaming-a-repository
+
+curl 官方命令参数：--config -、--resolve、TLS验证与有界请求（2026-10-28核对）
+https://curl.se/docs/manpage.html
+
+AnyTLS 官方URI规范：auth/地址/端口/SNI/insecure/fragment百分号编码（2026-10-28核对）
+https://github.com/anytls/anytls-go/blob/main/docs/uri_scheme.md
+该规范没有标准pin/PEM/ALPN/ClientHello指纹字段；通用导出不通过关闭证书校验替代。

@@ -1,0 +1,31 @@
+# Only source and documentation belong in this repository.
+dist/
+release/
+__pycache__/
+*.pyc
+*.zip
+*.zip.sha256
+
+# Never commit runtime state, proxy credentials or TLS private material.
+state.json
+config.json
+update-source.json
+.ssh/
+gz-anytls_deploy
+gz-anytls_deploy.pub
+*.pem
+*.key
+*.crt
+*.log
+profiles/
+nodes/
+v2rayn/
+shadowrocket/
+subscriptions/
+subscriptions_v2rayn/
+subscriptions_shadowrocket/
+mihomo-profile.yaml
+mihomo-node.yaml
+subscription/
+manager-releases/
+releases/
