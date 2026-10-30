@@ -1,4 +1,4 @@
-AnyHarbor 1.7.4 — 使用与维护
+AnyHarbor 1.7.5 — 使用与维护
 
 项目：https://github.com/JackieSung4ev/AnyHarbor
 详细说明：https://github.com/JackieSung4ev/AnyHarbor/blob/main/docs/operations.md
@@ -20,13 +20,14 @@ any add 自动随机新增一个希腊英文名分组，生成独立密码和订
 二、节点和订阅
 
   any group list                 查看组ID
-  any export athena              显示指定组全部格式，包含标题
-  any export athena clash        只输出原始Clash YAML
+  any export athena              显示指定组节点片段与分享链接，不展示分流规则
+  any export athena clash        输出含分流规则的完整Clash YAML
   any export athena v2rayn       只输出v2rayN分享链接
   any export athena shadowrocket 只输出标准AnyTLS分享链接
   any sub athena                 显示指定组全部订阅链接
 
 保存文件时先设置umask 077，并指定单一格式；默认组合输出含标题，不直接当配置导入。
+默认Clash节点片段用于加入已有配置；需要完整配置时使用clash导出或/s/订阅。
 Clash/Mihomo使用/s/订阅；v2rayN使用/v/；Shadowrocket使用/r/。
 /v/为Base64编码的v2rayn://anytls/…，/r/为Base64编码的anytls://列表。
 订阅已经编码，不要二次编码；Clash YAML转Base64不会变成Shadowrocket订阅。

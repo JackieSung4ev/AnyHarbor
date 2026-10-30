@@ -6,7 +6,7 @@
 
 使用官方 sing-box 核心，每个分组拥有独立密码和订阅链接，支持 Clash / Mihomo、v2rayN 和 Shadowrocket。AnyHarbor 是独立维护工具，并非 sing-box 官方安装器。
 
-**版本：1.7.4** · Debian 12/13、Ubuntu 22.04/24.04/26.04 + systemd · amd64 / arm64 · 管理命令需要 root
+**版本：1.7.5** · Debian 12/13、Ubuntu 22.04/24.04/26.04 + systemd · amd64 / arm64 · 管理命令需要 root
 
 ## 安装
 
@@ -64,6 +64,8 @@ any export athena                 # 查看这个分组的全部节点格式
 any sub athena                    # 查看这个分组的全部订阅链接
 any subscription check athena     # 检查本机实际发布的订阅正文
 ```
+
+默认导出只显示 Clash 节点片段、v2rayN 和 Shadowrocket 分享链接，不展示分流规则。节点片段用于加入已有配置；需要含规则的完整 Clash 配置，可使用 `/s/` 订阅或 `any export athena clash`。
 
 只复制对应格式的配置或完整 URL，不复制标题。订阅已经编码，不要再次 Base64 编码；Clash YAML 转成 Base64 也不会成为 Shadowrocket 订阅。多台服务器汇总见[操作说明](docs/operations.md#汇总多个服务器)。
 

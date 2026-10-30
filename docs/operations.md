@@ -4,7 +4,7 @@
 
 ## 导出与导入
 
-运行 `any` → **2**，按数字选组，复制适合客户端的区段。Clash / Mihomo 使用 YAML，v2rayN 使用 `v2rayn://anytls/…`，Shadowrocket 使用 `anytls://…`。
+运行 `any` → **2**，按数字选组，复制适合客户端的区段。Clash / Mihomo 显示仅含节点的 YAML 片段，v2rayN 使用 `v2rayn://anytls/…`，Shadowrocket 使用 `anytls://…`。默认导出不展示分流规则；Clash 节点片段用于加入已有配置，完整配置请使用订阅或下面的显式 `clash` 导出。
 
 v2rayN 可在主界面按 `Ctrl+V` 导入完整单行链接，并使用支持 AnyTLS 的 sing-box 核心。Shadowrocket 可从剪贴板导入通用 AnyTLS 链接，订阅选择标明 Shadowrocket 的 `/r/…` URL。各客户端须使用支持 AnyTLS 的版本；软件名称相近不代表格式兼容，尤其不要把 v2rayNG 与 v2rayN 等同。
 
@@ -13,8 +13,8 @@ v2rayN 可在主界面按 `Ctrl+V` 导入完整单行链接，并使用支持 An
 | 目的 | 命令 |
 | --- | --- |
 | 查看分组 ID | `any group list` |
-| 显示一个分组的全部格式 | `any export athena` |
-| 只显示原始 Clash YAML | `any export athena clash` |
+| 显示一个分组的节点片段与全部分享链接 | `any export athena` |
+| 输出含分流规则的完整 Clash YAML | `any export athena clash` |
 | 只显示原始 v2rayN 链接 | `any export athena v2rayn` |
 | 只显示原始 Shadowrocket 链接 | `any export athena shadowrocket` |
 

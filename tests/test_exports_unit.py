@@ -69,10 +69,12 @@ class ExportStateTests(ExportFixture):
     def test_combined_export_contains_only_requested_groups_formats_without_writes(self):
         before = self.snapshot()
         output = self.invoke('export-all', self.directory, 'athena')
-        self.assertIn('Clash / Mihomo YAML', output)
+        self.assertIn('Clash / Mihomo', output)
         self.assertIn('v2rayN 分享链接', output)
         self.assertIn('Shadowrocket / AnyTLS 分享链接', output)
-        self.assertIn((self.directory / 'profiles/athena.yaml').read_text(), output)
+        self.assertIn((self.directory / 'nodes/athena.yaml').read_text(), output)
+        for section in ('mixed-port:', 'proxy-groups:', 'rules:'):
+            self.assertNotIn(section, output)
         self.assertIn((self.directory / 'v2rayn/athena.txt').read_text(), output)
         self.assertIn((self.directory / 'shadowrocket/athena.txt').read_text(), output)
         for group in self.state['groups'][1:]:
@@ -84,6 +86,8 @@ class ExportStateTests(ExportFixture):
         clash = self.invoke('export', self.directory, 'athena')
         share = self.invoke('export-v2rayn', self.directory, 'athena')
         self.assertEqual(clash, (self.directory / 'profiles/athena.yaml').read_text())
+        self.assertIn('rules:\n', clash)
+        self.assertIn('  - MATCH,PROXY\n', clash)
         self.assertEqual(share, (self.directory / 'v2rayn/athena.txt').read_text())
         self.assertEqual(len(share.splitlines()), 1)
         payload = share.strip().removeprefix('v2rayn://anytls/')
@@ -100,8 +104,13 @@ class ExportStateTests(ExportFixture):
             with self.subTest(arguments=arguments):
                 self.reject_without_output('export-all', *arguments)
         self.assertEqual(self.snapshot(), before)
-        (self.directory / 'v2rayn/athena.txt').unlink()
-        self.reject_without_output('export-all', self.directory, 'athena')
+        for filename in ('nodes/athena.yaml', 'v2rayn/athena.txt'):
+            with self.subTest(missing=filename):
+                path = self.directory / filename
+                original = path.read_bytes()
+                path.unlink()
+                self.reject_without_output('export-all', self.directory, 'athena')
+                path.write_bytes(original)
 
     def test_legacy_raw_clash_fallback_remains_readable_without_migrating_state(self):
         raw = dict(self.state)
@@ -219,7 +228,10 @@ systemctl() { return 0; }
     def test_shell_default_export_and_explicit_raw_formats(self):
         result = self.run_shell('main export athena')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('Clash / Mihomo YAML', result.stdout)
+        self.assertIn('Clash / Mihomo', result.stdout)
+        self.assertIn((self.directory / 'nodes/athena.yaml').read_text(), result.stdout)
+        for section in ('mixed-port:', 'proxy-groups:', 'rules:'):
+            self.assertNotIn(section, result.stdout)
         self.assertIn('v2rayn://anytls/', result.stdout)
         for command, filename in [('export athena clash', 'profiles/athena.yaml'),
                                   ('export-clash athena', 'profiles/athena.yaml'),
@@ -235,7 +247,10 @@ systemctl() { return 0; }
     def test_numeric_export_menu_selects_correct_enabled_group(self):
         result = self.run_shell('menu_export export', '2\n')
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn((self.directory / 'nodes/hermes.yaml').read_text(), result.stdout)
         self.assertIn((self.directory / 'v2rayn/hermes.txt').read_text(), result.stdout)
+        for section in ('mixed-port:', 'proxy-groups:', 'rules:'):
+            self.assertNotIn(section, result.stdout)
         self.assertNotIn(self.state['groups'][0]['password'], result.stdout)
         for answer in ('', '3\n', 'athena\n'):
             with self.subTest(answer=answer):

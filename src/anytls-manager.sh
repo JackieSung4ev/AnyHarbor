@@ -13,7 +13,7 @@ readonly SHORT_MANAGER=/usr/local/sbin/any
 readonly OWNER_MARK=jackie-anytls-manager-v1 DEFAULT_VERSION=1.14.4
 SELF=$(readlink -f -- "${BASH_SOURCE[0]}")
 WORK=''
-readonly MANAGER_VERSION=1.7.4
+readonly MANAGER_VERSION=1.7.5
 say() { printf '%s\n' "$*"; }
 die() { printf '错误：%s\n' "$*" >&2; exit 1; }
 ui_color() {
@@ -458,8 +458,8 @@ show_summary() {
     else
         ui_note '当前使用固定证书指纹；Shadowrocket 格式仅在导入受信任 CA 证书后提供，不会跳过证书验证。'
     fi
-    ui_note '运行 any export <组ID> 查看该组所有支持的格式；运行 any groups 打开分组管理。'
-    ui_note '需要单独保存文件时，使用 export <组ID> clash、v2rayn 或 shadowrocket。'
+    ui_note '运行 any export <组ID> 查看该组所有节点格式（不展示分流规则）；运行 any groups 打开分组管理。'
+    ui_note '完整 Clash 配置使用 export <组ID> clash；单行链接使用 v2rayn 或 shadowrocket。'
     if [[ $(py get "$d/state.json" subscription_enabled) == 1 ]]; then
         ui_note '在线订阅已配置。运行 any sub <组ID> 查看该组所有格式的订阅链接。'
     else
@@ -668,12 +668,12 @@ uninstall_server() {
 }
 help_text() {
 cat <<'HELP'
-AnyHarbor 管理工具 1.7.4（独立 sing-box 服务）
+AnyHarbor 管理工具 1.7.5（独立 sing-box 服务）
 用法：any [命令]；直接输入 any 打开数字菜单
   install                            安装向导：域名与已有可信证书，或IPv4自签测试
   install 公网IPv4或域名 [端口8443]  兼容非交互安装，使用自签证书
   status / diagnose                  查看服务、证书、监听及本机TLS
-  export [组ID] [all|clash|v2rayn|shadowrocket] 默认显示支持的格式；指定格式输出原始内容
+  export [组ID] [all|clash|v2rayn|shadowrocket] 默认只显示节点片段与分享链接；clash输出完整配置
   export-clash [组ID]                仅输出完整 YAML，适合重定向保存
   export-v2rayn [组ID]               v2rayN 7.22.6+ 单行分享链接（含组密码）
   export-shadowrocket [组ID]         Shadowrocket 单行分享链接（仅可信证书模式）

@@ -895,6 +895,8 @@ def group_export(raw, directory, group, format_name):
         path = base / 'profiles' / (group['id'] + '.yaml')
         if raw.get('schema') == 1 and group['id'] == 'legacy' and not path.exists():
             path = base / 'mihomo-profile.yaml'
+    elif format_name == 'clash-node':
+        path = base / 'nodes' / (group['id'] + '.yaml')
     else:
         require(format_name in ('v2rayn', 'shadowrocket'),
                 'Export format must be clash, v2rayn or shadowrocket.')
@@ -1506,12 +1508,12 @@ def main(argv):
         group = selected_group(state, args[2] if len(args) > 2 else None)
         if command == 'export-all':
             # Read every supported format first; failures must not print partial credentials.
-            clash = group_export(raw, args[1], group, 'clash')
+            clash = group_export(raw, args[1], group, 'clash-node')
             v2rayn = group_export(raw, args[1], group, 'v2rayn')
             extra = ('=== Shadowrocket / AnyTLS 分享链接 ===\n' +
                      group_export(raw, args[1], group, 'shadowrocket').rstrip('\n')
                      if state['tls_verify'] == 'pki' else SHADOWROCKET_PIN_NOTICE)
-            print('分组：{} ({})\n\n=== Clash / Mihomo YAML ===\n{}\n\n'
+            print('分组：{} ({})\n\n=== Clash / Mihomo 节点 YAML ===\n{}\n\n'
                   '=== v2rayN 分享链接 ===\n{}\n\n{}'.format(
                       group['label'], group['id'], clash.rstrip('\n'), v2rayn.rstrip('\n'), extra))
         else:
