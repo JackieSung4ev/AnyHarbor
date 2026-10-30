@@ -1,4 +1,4 @@
-AnyHarbor 1.7.3 — 使用与维护
+AnyHarbor 1.7.4 — 使用与维护
 
 项目：https://github.com/JackieSung4ev/AnyHarbor
 详细说明：https://github.com/JackieSung4ev/AnyHarbor/blob/main/docs/operations.md
@@ -53,25 +53,30 @@ Shadowrocket/标准URI只用于可信证书模式，自签/固定证书模式不
 完整订阅URL也是凭据，不能公开整个分发表。检查本机正文不会验证公网DNS/CDN或缓存。
 
 Clash默认分流规则：
-运行any rules，或any → 3 → 10。子菜单1状态、2导入、3显示、4重置、0返回。
-  any rules import /root/clash-rules.json  导入本机规则文件
+新安装自动带516条内置规则，无需上传文件。指定直连/代理/拦截规则优先，
+随后GEOIP,CN,DIRECT，最后MATCH,PROXY；不是所有大陆网站都保证直连。
+未导入自定义规则时，self-update会使用当前内置规则；已导入的自定义规则保留。
+运行any rules，或any → 3 → 10。子菜单1状态、2导入、3显示、4恢复内置、0返回。
+  any rules import /root/clash-rules.json  可选：导入本机自定义规则
   any rules show                         显示当前规则
-  any rules reset                        恢复内置MATCH,PROXY
+  any rules reset                        清除自定义覆盖，恢复当前内置规则
 
 文件是UTF-8 JSON字符串数组，不是完整YAML，也不是改后缀即可。大陆IP直连、其余代理的最小示例：
   ["GEOIP,CN,DIRECT", "MATCH,PROXY"]
 从已有Clash配置只提取rules列表，保留每条字符串和顺序，不包含节点、代理组或DNS等设置。
 支持DOMAIN、DOMAIN-SUFFIX、DOMAIN-KEYWORD、IP-CIDR、IP-CIDR6、GEOIP、MATCH；
 IP/GEOIP可带no-resolve，1..5000条，最后必须是唯一的MATCH,PROXY；域名使用ASCII/Punycode。
-Proxy统一为PROXY；自定义规则的PROXY组只含当前分组节点，不混入其他组账号。
+Proxy统一为PROXY；PROXY组只含当前分组节点，不混入其他组账号。
 不支持的规则或目标拒绝导入，原配置保留；多个节点或外部规则源不能直接照搬。
 既有和新增分组的完整Clash导出及/s/订阅共用本机规则，客户端更新原订阅并使用规则模式。
 只导入节点片段不含分流规则；v2rayN、Shadowrocket格式和服务端直连/WARP设置不受影响。
 DIRECT由客户端直连，PROXY流量进入AnyTLS后才按分组选择服务端出口。
 导入/重置不重启代理服务、不换密码或订阅URL，通常无需另跑subscription refresh。
-每台服务器分别导入一次；规则留在运行数据中，正常更新及核心回滚保留，不上传GitHub。
+内置规则随公开源码维护；自定义规则留在运行数据中，正常更新及核心回滚保留，不上传GitHub。
+只有需要自定义覆盖时，才需在每台服务器分别导入；默认安装不需要这一步。
 管理代码回退会拒绝不支持当前规则的旧版本；不要直接运行旧版脚本绕过兼容检查。
-重置是恢复全部MATCH到PROXY，不是恢复大陆直连。地区分类与实际可用性仍需客户端验证。
+1.7.4起reset不再恢复为仅MATCH,PROXY；需要全代理可导入仅含这条规则的JSON数组。
+客户端更新原订阅后才收到规则变化；地区分类与实际可用性仍需客户端验证。
 
 四、证书与节点前缀
 

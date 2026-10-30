@@ -6,7 +6,7 @@
 
 使用官方 sing-box 核心，每个分组拥有独立密码和订阅链接，支持 Clash / Mihomo、v2rayN 和 Shadowrocket。AnyHarbor 是独立维护工具，并非 sing-box 官方安装器。
 
-**版本：1.7.3** · Debian 12/13、Ubuntu 22.04/24.04/26.04 + systemd · amd64 / arm64 · 管理命令需要 root
+**版本：1.7.4** · Debian 12/13、Ubuntu 22.04/24.04/26.04 + systemd · amd64 / arm64 · 管理命令需要 root
 
 ## 安装
 
@@ -69,13 +69,15 @@ any subscription check athena     # 检查本机实际发布的订阅正文
 
 ### Clash 默认分流规则
 
-运行 **`any rules`**，或菜单 **3 → 10**，导入本机的规则 JSON 文件。已有分组与以后新增分组的完整 Clash 配置、`/s/` 订阅都会使用这套规则；客户端更新原订阅并使用规则模式即可。
+**新安装自动使用 516 条内置规则，无需上传规则文件。** 先匹配指定的直连、代理和拦截规则，再按大陆 IP 直连，未匹配流量走 `PROXY`。指定规则优先，因此不等于所有大陆网站都直连。已有及新增分组的完整 Clash 配置、`/s/` 订阅共用这套规则，各组 `PROXY` 只包含自己的节点。
+
+没有导入自定义规则的服务器，更新管理工具时会使用当前内置规则。已有自定义规则会保留；需要切换回内置规则时运行：
 
 ```bash
-any rules import /root/clash-rules.json
+any rules reset
 ```
 
-文件只包含规则字符串数组，不是整份 Clash YAML。规则按原顺序保留，`Proxy` 会统一为当前分组的 `PROXY` 代理组；不会混入其他分组节点。规则留在服务器运行数据中，更新源码不上传或覆盖它；多台服务器分别导入一次。修改规则不重启代理服务、不更换密码或订阅 URL，v2rayN、Shadowrocket 和服务端 WARP 设置不受影响。[文件格式与维护](docs/operations.md#clash-默认分流规则)
+客户端更新原订阅并使用规则模式即可。运行 **`any rules`** 或菜单 **3 → 10** 可查看规则，或导入本机 JSON 文件作为自定义覆盖；自定义规则留在服务器，不随源码上传。修改规则不重启代理服务、不更换密码或订阅 URL，v2rayN、Shadowrocket 和服务端 WARP 设置不受影响。[文件格式与维护](docs/operations.md#clash-默认分流规则)
 
 ## 可选 WARP 出口
 

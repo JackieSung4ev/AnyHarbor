@@ -624,13 +624,13 @@ rules_command() {
         (($# == 0)) || die '用法：any rules [show|import JSON文件|reset]'
         ui_heading 'Clash 默认分流规则' page
         if ((count)); then ui_note "当前    自定义规则 $count 条"
-        else ui_note '当前    内置 MATCH,PROXY（全部代理）'; fi
+        else ui_note "当前    内置分流规则 $(py get "$old_data/state.json" builtin_clash_rule_count) 条"; fi
         ui_note '范围    本机全部已有及新增分组的 Clash 完整配置与订阅'
         ui_note '导入 JSON 规则数组；不会导入节点、DNS、监听端口或远程规则源。'
         ui_item 1 '查看规则状态'
         ui_item 2 '导入本机规则 JSON 文件'
         ui_item 3 '显示当前完整规则（JSON）'
-        ui_item 4 '恢复内置全代理规则'
+        ui_item 4 '恢复内置分流规则'
         ui_item 0 '返回'
         ui_prompt choice '请输入选项编号：' || return 0
         case "$choice" in
@@ -638,7 +638,7 @@ rules_command() {
             2) ui_prompt file '本机规则 JSON 文件绝对路径：' || return 0
                [[ -n "$file" ]] || die '文件路径不能为空。'; action=import; set -- "$file";;
             3) action=show;;
-            4) ui_prompt choice '将恢复为全部走 PROXY；输入 RESET 确认，其他输入取消：' || return 0
+            4) ui_prompt choice '将替换本机自定义规则，恢复内置分流；输入 RESET 确认，其他输入取消：' || return 0
                [[ "$choice" == RESET ]] || return 0; action=reset;;
             0) return;; *) die '无效选择。';;
         esac
@@ -649,7 +649,7 @@ rules_command() {
         import) (($# == 1)) || die '用法：any rules import /绝对路径/clash-rules.json'
                 [[ "$1" == /* && -f "$1" && ! -L "$1" ]] || die '规则文件必须是本机绝对路径下的普通 JSON 文件，不能是符号链接。';;
         reset) (($# == 0)) || die '用法：any rules reset'
-               if ((count == 0)); then say '当前已经使用内置全代理规则。'; return; fi;;
+               if ((count == 0)); then say '当前已经使用内置分流规则。'; return; fi;;
         *) die '用法：any rules [show|import JSON文件|reset]';;
     esac
     clone_current
@@ -704,7 +704,7 @@ manager_rollback() {
     python3 "$target/anytls-state.py" render "$check_dir"
     "$check_dir/sing-box" check -c "$check_dir/config.json"
     updater protect "$old_data" "$check_dir" >/dev/null
-    if [[ $(py get "$old_data/state.json" node_prefix) != GZ || $(py get "$old_data/state.json" clash_rule_count) != 0 ]] && ! manager_exports_equal "$old_data" "$check_dir" rollback; then
+    if ! manager_exports_equal "$old_data" "$check_dir" rollback; then
         die '目标管理器不能原样生成当前导出，已拒绝回退以保留自定义前缀和Clash规则。'
     fi
     if [[ ! -f "$target/.legacy" ]]; then updater verify "$target" >/dev/null; fi

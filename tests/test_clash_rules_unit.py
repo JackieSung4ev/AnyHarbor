@@ -147,9 +147,24 @@ class ClashRulesFixture(unittest.TestCase):
 
 
 class ClashRulesStateTests(ClashRulesFixture):
+    def test_new_install_and_new_groups_use_valid_bundled_rules_without_an_override(self):
+        builtin = list(state.DEFAULT_CLASH_RULES)
+        self.assertEqual(len(builtin), 516)
+        self.assertEqual(state.validate_clash_rules(builtin), builtin)
+        self.assertEqual(builtin[-2:], ['GEOIP,CN,DIRECT', 'MATCH,PROXY'])
+        self.assertEqual(self.command('get', 'builtin_clash_rule_count').strip(), str(len(builtin)))
+        self.assertNotIn('clash_rules', state.load(self.path))
+        self.command('group', 'add')
+        self.render()
+        for group in state.active(state.load(self.path)):
+            profile = (self.directory / 'profiles' / (group['id'] + '.yaml')).read_text(encoding='utf-8')
+            self.assertEqual(profile_rules(profile), builtin)
+            self.assertNotIn('      - DIRECT\n', profile)
+        self.assertNotIn('clash_rules', state.load(self.path))
+
     def test_import_show_reset_preserve_every_unrelated_state_value(self):
         self.assertEqual(self.command('get', 'clash_rule_count').strip(), '0')
-        self.assertEqual(json.loads(self.command('clash-rules', 'show')), ['MATCH,PROXY'])
+        self.assertEqual(json.loads(self.command('clash-rules', 'show')), list(state.DEFAULT_CLASH_RULES))
         self.import_rules()
         expected = copy.deepcopy(self.initial)
         expected['clash_rules'] = CANONICAL_RULES
@@ -160,6 +175,21 @@ class ClashRulesStateTests(ClashRulesFixture):
         self.assertEqual(self.path.read_bytes(), before)
         self.command('clash-rules', 'reset')
         self.assertEqual(state.load(self.path), self.initial)
+        self.assertEqual(json.loads(self.command('clash-rules', 'show')), list(state.DEFAULT_CLASH_RULES))
+        self.render()
+        profile = (self.directory / 'profiles/athena.yaml').read_text(encoding='utf-8')
+        self.assertEqual(profile_rules(profile), list(state.DEFAULT_CLASH_RULES))
+
+    def test_a_changed_bundled_default_never_overwrites_a_local_override(self):
+        self.import_rules()
+        before = self.path.read_bytes()
+        replacement = ('DOMAIN,another.example.test,DIRECT', 'MATCH,PROXY')
+        with mock.patch.object(state, 'DEFAULT_CLASH_RULES', replacement):
+            self.render()
+            self.assertEqual(json.loads(self.command('clash-rules', 'show')), CANONICAL_RULES)
+            profile = (self.directory / 'profiles/athena.yaml').read_text(encoding='utf-8')
+            self.assertEqual(profile_rules(profile), CANONICAL_RULES)
+        self.assertEqual(self.path.read_bytes(), before)
 
     def test_invalid_import_never_changes_saved_state(self):
         self.import_rules()
@@ -317,6 +347,21 @@ class ClashRulesUpgradeProtectionTests(ClashRulesFixture):
             self.change_candidate(mutate)
             with self.subTest(mutate=mutate), self.assertRaises(ValueError):
                 updater.protect(self.directory, self.candidate, allow_rules=True)
+
+    def test_builtin_update_changes_client_profiles_with_same_state_and_runtime(self):
+        # Old managers used only a final proxy rule. A code upgrade must publish
+        # the new default profiles even though server state and runtime are equal.
+        with mock.patch.object(state, 'DEFAULT_CLASH_RULES', ('MATCH,PROXY',)):
+            self.render()
+        before = self.path.read_bytes()
+        old_profile = (self.directory / 'profiles/athena.yaml').read_bytes()
+        self.render(self.candidate)
+        new_profile = (self.candidate / 'profiles/athena.yaml').read_bytes()
+        self.assertNotEqual(old_profile, new_profile)
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertEqual((self.candidate / 'state.json').read_bytes(), before)
+        self.assertEqual(updater.protect(self.directory, self.candidate), 'same_runtime')
+        self.assertEqual(profile_rules(new_profile.decode('utf-8')), list(state.DEFAULT_CLASH_RULES))
 
 
 @unittest.skipUnless(sys.platform.startswith('linux') and shutil.which('bash'),
@@ -492,7 +537,7 @@ ui_prompt() { IFS= read -r -p "$2" "$1"; }
         result, events = self.run_cli('rules', input_text='0\n')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('HEADING:', result.stdout)
-        self.assertIn('MATCH,PROXY', result.stdout)
+        self.assertIn(str(len(state.DEFAULT_CLASH_RULES)), result.stdout)
         self.assertNotIn('clone', events)
         self.assertNotIn('snapshot', events)
         self.assertEqual(self.path.read_bytes(), before)
@@ -503,6 +548,13 @@ ui_prompt() { IFS= read -r -p "$2" "$1"; }
 class ClashRulesRollbackTests(ClashRulesFixture):
     def test_default_prefix_cannot_roll_back_to_renderer_ignoring_custom_rules(self):
         self.import_rules()
+        self.assert_old_renderer_refused()
+
+    def test_builtin_rules_cannot_roll_back_to_old_all_proxy_default(self):
+        self.assertNotIn('clash_rules', state.load(self.path))
+        self.assert_old_renderer_refused()
+
+    def assert_old_renderer_refused(self):
         self.render()
         before = self.path.read_bytes()
         profile_before = (self.directory / 'profiles/athena.yaml').read_bytes()
@@ -526,7 +578,7 @@ spec.loader.exec_module(helper)
 original = helper.group_documents
 def old_documents(state, *args):
     legacy = dict(state)
-    legacy.pop('clash_rules', None)
+    legacy['clash_rules'] = ['MATCH,PROXY']
     return original(legacy, *args)
 helper.group_documents = old_documents
 helper.certificate_info = lambda *args: 'ab' * 32
