@@ -615,6 +615,7 @@ subscription_command() {
         ui_item 6 '刷新订阅发布格式'
         ui_item 7 '检查各格式订阅实际内容'
         ui_item 8 '手动配置域名 / 导入续期证书'
+        ui_item 10 'Clash 默认分流规则（全部分组）'
         ui_section '链接分发'
         ui_item 3 '按组查看全部格式的订阅链接'
         ui_item 5 '导出 v2rayN 订阅链接'
@@ -633,6 +634,7 @@ subscription_command() {
             7) menu_select_group identifier; action=check; set -- "$identifier";;
             8) action=manual;;
             9) menu_select_group identifier yes; action=links; set -- shadowrocket "$identifier";;
+            10) rules_command; return;;
             0) return;; *) die '无效选择。';;
         esac
     fi

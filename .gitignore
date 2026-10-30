@@ -10,6 +10,7 @@ __pycache__/
 state.json
 config.json
 update-source.json
+clash-rules.json
 .ssh/
 gz-anytls_deploy
 gz-anytls_deploy.pub

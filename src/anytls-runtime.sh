@@ -603,6 +603,74 @@ prefix_command() {
     fi
 }
 
+rules_commit_worker() {
+    local transaction=$1 next_data=$2 old_data
+    manager_transaction_guard "$transaction"; guard_generation "$next_data"
+    old_data=$(cat "$transaction/current"); guard_generation "$old_data"
+    [[ $(current) == "$old_data" ]] || die '当前数据版本已变化，拒绝应用过期规则设置。'
+    [[ $(updater protect-rules "$old_data" "$next_data") == same_runtime ]] || die '规则设置改变了代理运行配置，已拒绝。'
+    atomic_link "$old_data" "$BASE/previous"
+    atomic_link "$next_data" "$BASE/current"
+    if [[ $(cat "$transaction/was-active") == yes ]]; then healthy "$next_data" || die '规则设置后本机TLS检查失败。'; fi
+    printf 'complete\n' >"$transaction/status"
+}
+
+rules_command() {
+    local action=${1:-menu} choice file old_data count old_bundle transaction
+    shift || true
+    old_data=$(current)
+    count=$(py get "$old_data/state.json" clash_rule_count)
+    if [[ "$action" == menu ]]; then
+        (($# == 0)) || die '用法：any rules [show|import JSON文件|reset]'
+        ui_heading 'Clash 默认分流规则' page
+        if ((count)); then ui_note "当前    自定义规则 $count 条"
+        else ui_note '当前    内置 MATCH,PROXY（全部代理）'; fi
+        ui_note '范围    本机全部已有及新增分组的 Clash 完整配置与订阅'
+        ui_note '导入 JSON 规则数组；不会导入节点、DNS、监听端口或远程规则源。'
+        ui_item 1 '查看规则状态'
+        ui_item 2 '导入本机规则 JSON 文件'
+        ui_item 3 '显示当前完整规则（JSON）'
+        ui_item 4 '恢复内置全代理规则'
+        ui_item 0 '返回'
+        ui_prompt choice '请输入选项编号：' || return 0
+        case "$choice" in
+            1) say "自定义规则：$count 条；适用于当前服务器全部分组。"; return;;
+            2) ui_prompt file '本机规则 JSON 文件绝对路径：' || return 0
+               [[ -n "$file" ]] || die '文件路径不能为空。'; action=import; set -- "$file";;
+            3) action=show;;
+            4) ui_prompt choice '将恢复为全部走 PROXY；输入 RESET 确认，其他输入取消：' || return 0
+               [[ "$choice" == RESET ]] || return 0; action=reset;;
+            0) return;; *) die '无效选择。';;
+        esac
+    fi
+    case "$action" in
+        show) (($# == 0)) || die '用法：any rules show'
+              py clash-rules "$old_data/state.json" show; return;;
+        import) (($# == 1)) || die '用法：any rules import /绝对路径/clash-rules.json'
+                [[ "$1" == /* && -f "$1" && ! -L "$1" ]] || die '规则文件必须是本机绝对路径下的普通 JSON 文件，不能是符号链接。';;
+        reset) (($# == 0)) || die '用法：any rules reset'
+               if ((count == 0)); then say '当前已经使用内置全代理规则。'; return; fi;;
+        *) die '用法：any rules [show|import JSON文件|reset]';;
+    esac
+    clone_current
+    py clash-rules "$WORK/state.json" "$action" "$@"
+    finalize_generation
+    [[ $(updater protect-rules "$old_data" "$WORK") == same_runtime ]] || die '规则设置改变了代理运行配置，已拒绝。'
+    if manager_exports_equal "$old_data" "$WORK"; then say '规则没有变化，无需发布。'; return; fi
+    manager_roots; manager_target_guard
+    old_bundle=$(manager_active_bundle)
+    transaction=$(manager_snapshot "$old_bundle")
+    if GZ_ANYTLS_INHERIT_LOCK=1 bash "$SELF" __rules-commit "$transaction" "$WORK"; then
+        say '已发布全部分组的 Clash 规则；代理及订阅服务未重启。'
+        say '密码、节点、订阅地址及其他客户端格式不变。请在客户端更新原 Clash 订阅。'
+    else
+        if GZ_ANYTLS_INHERIT_LOCK=1 bash "$SELF" __manager-restore "$transaction"; then
+            die "规则设置未生效，原配置已恢复。事务记录：$transaction"
+        fi
+        die "规则设置失败且自动恢复不完整，请保留事务记录：$transaction"
+    fi
+}
+
 upgrade_manager() {
     local old_data old_bundle next_bundle transaction
     old_data=$(current)
@@ -636,8 +704,8 @@ manager_rollback() {
     python3 "$target/anytls-state.py" render "$check_dir"
     "$check_dir/sing-box" check -c "$check_dir/config.json"
     updater protect "$old_data" "$check_dir" >/dev/null
-    if [[ $(py get "$old_data/state.json" node_prefix) != GZ ]] && ! manager_exports_equal "$old_data" "$check_dir" rollback; then
-        die '目标管理器不能原样生成当前导出，已拒绝回退以保留自定义前缀；请使用支持本机前缀的兼容版本。'
+    if [[ $(py get "$old_data/state.json" node_prefix) != GZ || $(py get "$old_data/state.json" clash_rule_count) != 0 ]] && ! manager_exports_equal "$old_data" "$check_dir" rollback; then
+        die '目标管理器不能原样生成当前导出，已拒绝回退以保留自定义前缀和Clash规则。'
     fi
     if [[ ! -f "$target/.legacy" ]]; then updater verify "$target" >/dev/null; fi
     transaction=$(manager_snapshot "$old_bundle")

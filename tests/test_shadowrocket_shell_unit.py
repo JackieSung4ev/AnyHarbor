@@ -279,7 +279,9 @@ py() {
         self.assertIn('不会跳过证书验证', result.stdout)
         result = self.run_shell('help_text')
         self.assert_success(result)
-        self.assertIn('1.7.2', result.stdout)
+        version = re.search(r'^readonly MANAGER_VERSION=([0-9.]+)$',
+                            MANAGER.read_text(), re.MULTILINE).group(1)
+        self.assertIn(version, result.stdout)
         self.assertIn('export-shadowrocket', result.stdout)
         self.assertIn('subscription check', result.stdout)
 

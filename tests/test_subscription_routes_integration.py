@@ -245,6 +245,8 @@ def main():
             state['groups'][0]['label'] = 'Athena / 華南 #1'
             state['sni'] = DOMAIN
             state['tls_mode'], state['tls_verify'] = 'imported', 'pki'
+            state['clash_rules'] = ['DOMAIN-SUFFIX,example.test,PROXY',
+                                    'GEOIP,CN,DIRECT', 'MATCH,PROXY']
             port = free_port()
             state['subscription'] = {'domain': DOMAIN, 'port': port}
             helper.write_json(generation / 'state.json', state)
@@ -260,6 +262,8 @@ def main():
             expected = {'clash': (generation / 'subscriptions' / (token + '.yaml')).read_bytes(),
                         'v2rayn': (generation / 'subscriptions_v2rayn' / (token + '.txt')).read_bytes(),
                         'shadowrocket': (generation / 'subscriptions_shadowrocket' / (token + '.txt')).read_bytes()}
+            assert expected['clash'].endswith(('rules:\n' + ''.join(
+                '  - ' + rule + '\n' for rule in state['clash_rules'])).encode('utf-8'))
             share = base64.b64decode(expected['v2rayn'].strip(), validate=True).decode().strip()
             assert share.startswith('v2rayn://anytls/')
             payload = share.removeprefix('v2rayn://anytls/')

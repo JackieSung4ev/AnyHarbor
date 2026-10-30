@@ -499,10 +499,16 @@ def prepare(base, current, requested='latest', check_only=False):
     return str(candidate)
 
 
-def protect(old, new, allow_prefix=False):
+def protect(old, new, allow_prefix=False, allow_rules=False):
     old, new = Path(old), Path(new)
     states = [json.loads((p / 'state.json').read_text(encoding='utf-8')) for p in (old, new)]
     before, after = states
+    require(allow_rules or before.get('clash_rules') == after.get('clash_rules'),
+            'Upgrade changed the server default Clash rules.')
+    if allow_rules:
+        require({k: v for k, v in before.items() if k != 'clash_rules'} ==
+                {k: v for k, v in after.items() if k != 'clash_rules'},
+                'Rules import changed unrelated managed state.')
     require(after.get('schema') in (2, 3) and before.get('schema') in (1, 2, 3),
             'Unsupported upgrade state schema.')
     require(not (before['schema'] == 3 and after['schema'] != 3),
@@ -567,9 +573,10 @@ def main(args):
     elif command == 'verify':
         require(len(values) in (1, 2), 'Usage: verify DIRECTORY [VERSION]')
         print(verify(values[0], values[1] if len(values) == 2 else None))
-    elif command in ('protect', 'protect-prefix'):
+    elif command in ('protect', 'protect-prefix', 'protect-rules'):
         require(len(values) == 2, 'Usage: protect OLD_GENERATION NEW_GENERATION')
-        print(protect(*values, allow_prefix=command == 'protect-prefix'))
+        print(protect(*values, allow_prefix=command == 'protect-prefix',
+                      allow_rules=command == 'protect-rules'))
     else:
         raise ValueError('Unknown update command.')
 

@@ -220,6 +220,69 @@ def rotate(group):
     group['token'] = secrets.token_urlsafe(32)
 
 
+def validate_clash_rules(rules):
+    """Accept a bounded, self-contained routing list, never a client config."""
+    require(isinstance(rules, list) and 1 <= len(rules) <= 5000,
+            'Clash rules must be a JSON array containing 1..5000 strings.')
+    result = []
+    total = 0
+    kinds = {'DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD',
+             'IP-CIDR', 'IP-CIDR6', 'GEOIP', 'MATCH'}
+    for number, rule in enumerate(rules, 1):
+        error = 'Invalid Clash rule #{}: '.format(number)
+        require(isinstance(rule, str) and 1 <= len(rule) <= 512 and
+                all(not unicodedata.category(c).startswith('C') for c in rule),
+                error + 'expected one printable rule, at most 512 characters.')
+        total += len(rule.encode('utf-8'))
+        require(total <= 256 * 1024, 'Clash rules exceed 256 KiB.')
+        fields = [part.strip() for part in rule.split(',')]
+        kind = fields[0]
+        require(kind in kinds, error + 'unsupported rule type or external rule provider.')
+        if kind == 'MATCH':
+            require(number == len(rules) and len(fields) == 2,
+                    error + 'MATCH must occur once, at the end.')
+            policy_index = 1
+        else:
+            require(len(fields) in (3, 4) and fields[1], error + 'missing match or action.')
+            policy_index = 2
+            if len(fields) == 4:
+                require(kind in ('IP-CIDR', 'IP-CIDR6', 'GEOIP') and fields[3] == 'no-resolve',
+                        error + 'only IP/GEOIP rules support no-resolve.')
+            if kind in ('IP-CIDR', 'IP-CIDR6'):
+                try:
+                    network = ipaddress.ip_network(fields[1], strict=False)
+                except ValueError:
+                    raise ValueError(error + 'invalid CIDR.') from None
+                require(network.version == (6 if kind == 'IP-CIDR6' else 4),
+                        error + 'CIDR address family differs from rule type.')
+            elif kind == 'GEOIP':
+                require(re.fullmatch(r'[A-Za-z]{2}|private', fields[1]) is not None,
+                        error + 'invalid GEOIP country code.')
+            else:
+                require(re.fullmatch(r'[A-Za-z0-9_.*-]+', fields[1]) is not None,
+                        error + 'use a plain ASCII domain/keyword (IDNs must use punycode).')
+        policy = fields[policy_index]
+        require(policy in ('Proxy', 'PROXY', 'DIRECT', 'REJECT'),
+                error + 'action must be Proxy/PROXY, DIRECT or REJECT; named nodes are not imported.')
+        fields[policy_index] = 'PROXY' if policy == 'Proxy' else policy
+        result.append(','.join(fields))
+    require(result[-1] == 'MATCH,PROXY', 'The final rule must be MATCH,PROXY.')
+    return result
+
+
+def read_clash_rules(path):
+    """Read data only, without YAML constructors, shell evaluation or downloads."""
+    source = Path(path)
+    require(not source.is_symlink(), 'Refusing a symbolic-link rules file.')
+    flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0)
+    fd = os.open(source, flags)
+    with os.fdopen(fd, 'rb') as stream:
+        require(stat.S_ISREG(os.fstat(stream.fileno()).st_mode), 'Rules file must be a regular file.')
+        data = stream.read(1024 * 1024 + 1)
+    require(len(data) <= 1024 * 1024, 'Rules JSON file exceeds 1 MiB.')
+    return validate_clash_rules(json.loads(data.decode('utf-8-sig')))
+
+
 def normalized(raw):
     require(isinstance(raw, dict), 'State must be an object.')
     state = copy.deepcopy(raw)
@@ -233,6 +296,8 @@ def normalized(raw):
         state['tls_verify'] = 'pin'
         state['subscription'] = None
     require(state.get('schema') in (2, 3), 'Unsupported managed state schema.')
+    if 'clash_rules' in state:
+        state['clash_rules'] = validate_clash_rules(state['clash_rules'])
     state['node_prefix'] = node_prefix(state.get('node_prefix', 'GZ'))
     state['server'] = host(state['server'])
     state['sni'] = host(state['sni'])
@@ -450,8 +515,14 @@ def group_documents(state, group, fingerprint, certificate):
     node = '\n'.join(lines) + '\n'
     profile = 'mixed-port: 7890\nallow-lan: false\nmode: rule\nlog-level: warning\n' + node
     profile += ('proxy-groups:\n  - name: PROXY\n    type: select\n'
-                '    proxies:\n      - ' + q(name) + '\n      - DIRECT\n'
-                'rules:\n  - MATCH,PROXY\n')
+                '    proxies:\n      - ' + q(name) + '\n')
+    if 'clash_rules' not in state:
+        profile += '      - DIRECT\n'
+    profile += 'rules:\n'
+    # Validated rules have fixed ASCII types/actions and no YAML delimiters
+    # followed by whitespace, so retain the familiar unquoted block scalars.
+    profile += ''.join('  - ' + rule + '\n'
+                       for rule in state.get('clash_rules', ['MATCH,PROXY']))
     share = v2rayn_share(state, group, name, certificate) + '\n'
     return node, profile, share
 
@@ -770,10 +841,28 @@ def main(argv):
         state = load(args[0])
         update_display_names(state)
         write_json(args[0], normalized(state))
+    elif command == 'clash-rules':
+        require(len(args) in (2, 3), 'Usage: clash-rules STATE show|reset|import [JSON_FILE]')
+        filename, action, *values = args
+        state = load(filename)
+        if action == 'show':
+            require(not values, 'show takes no file argument.')
+            print(json.dumps(state.get('clash_rules', ['MATCH,PROXY']), ensure_ascii=False, indent=2))
+        else:
+            if action == 'import':
+                require(len(values) == 1, 'import requires one JSON file.')
+                state['clash_rules'] = read_clash_rules(values[0])
+            elif action == 'reset':
+                require(not values, 'reset takes no file argument.')
+                state.pop('clash_rules', None)
+            else:
+                raise ValueError('Unknown Clash rules action.')
+            write_json(filename, normalized(state))
     elif command == 'get':
         state, key = load(args[0]), args[1]
         subscription = state['subscription'] or {}
         derived = {'group_count': len(state['groups']), 'active_group_count': len(active(state)),
+                   'clash_rule_count': len(state.get('clash_rules', [])),
                    'warp_group_count': sum(g.get('egress') == 'warp' for g in state['groups']),
                    'active_warp_group_count': sum(g.get('egress') == 'warp' for g in active(state)),
                    'node_name_override_count': sum('node_name' in g for g in state['groups']),
@@ -913,6 +1002,10 @@ def main(argv):
         candidate['groups'] = copy.deepcopy(current['groups'])
         candidate['subscription'] = copy.deepcopy(current['subscription'])
         candidate['node_prefix'] = current['node_prefix']
+        if 'clash_rules' in current:
+            candidate['clash_rules'] = copy.deepcopy(current['clash_rules'])
+        else:
+            candidate.pop('clash_rules', None)
         candidate['schema'] = max(current['schema'], candidate['schema'])
         write_json(args[1], normalized(candidate))
     elif command == 'release':

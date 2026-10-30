@@ -8,6 +8,8 @@ Mihomo AnyTLS
 https://wiki.metacubex.one/config/proxies/anytls/
 Mihomo TLS、指纹与正常证书验证
 https://wiki.metacubex.one/config/proxies/tls/
+Mihomo 路由规则、按序匹配、GEOIP 与 MATCH（2026-10-30核对）
+https://wiki.metacubex.one/config/rules/
 Mihomo测试客户端启动顺序与post-up就绪钩子（v1.19.33）
 https://github.com/MetaCubeX/mihomo/blob/v1.19.33/main.go
 https://github.com/MetaCubeX/mihomo/blob/v1.19.33/hub/executor/executor.go
